@@ -57,46 +57,71 @@ Drive Env follows the envelope's curves, not a straight version of them.
 ## Build Requirements
 
 - CMake 3.25+
-- A C++23-capable compiler
-- Git
-- macOS development environment for AU/Standalone/VST3 builds
+- A C++23-capable compiler:
+  - **macOS**: Xcode or its Command Line Tools (the `xcode` preset needs the full Xcode app)
+  - **Windows**: Visual Studio 2022 or later with the "Desktop development with C++" workload
+- Git (for downloading JUCE)
 
-## Building
+macOS builds VST3, AU and Standalone. Windows builds VST3 and Standalone, as AU is macOS-only.
 
-**Debug Build:**
+## Commands
+
+Every command is the same on macOS and Windows, except the rows marked **macOS** or **Windows**.
+Each workflow configures, builds and, for tests, runs in one go.
+
+| Task | Command |
+|---|---|
+| Build the plugin (Debug) | `cmake --workflow --preset debug` |
+| Build the plugin (Release) | `cmake --workflow --preset release` |
+| Run the unit tests | `cmake --workflow --preset unit` |
+| Run the unit tests against a Release build | `cmake --workflow --preset unit-release` |
+| Run the unit tests and pluginval | `cmake --workflow --preset test` |
+| Run all tests against a Release build | `cmake --workflow --preset test-release` |
+| Launch the Standalone app (Debug) | `cmake --build --preset run` |
+| Install the plugin for your DAW: **macOS** | Automatic on every build |
+| Install the plugin for your DAW: **Windows** | `cmake --build --preset install-windows`, from an administrator prompt |
+| Open in an IDE for debugging: **macOS** | `cmake --preset xcode`, then open `build-xcode/SubBass.xcodeproj` |
+| Open in an IDE for debugging: **Windows** | Open `build-debug\SubBass.sln` in Visual Studio after a Debug workflow |
+
+`run` and `install-windows` use the Debug build, so run `cmake --workflow --preset debug` once first.
+
+The individual steps still work on their own, for example to pass a `-D` option:
+
 ```bash
-cmake --preset debug
-cmake --build --preset debug
+cmake --preset debug -DPLUGINVAL_STRICTNESS=5   # configure
+cmake --build --preset test                     # build
+ctest --preset debug                            # test
 ```
 
-**Release Build:**
-```bash
-cmake --preset release
-cmake --build --preset release
-```
 
-Run the standalone:
+## Unit Tests
 
-```bash
-open build-debug/SubBass_artefacts/Debug/Standalone/SubBass.app
-```
+Unit tests live in `Tests/` and use [Catch2](https://github.com/catchorg/Catch2). They build into a
+`SubBass_Tests` executable that links the plugin's code and drives the processor directly, checking
+parameter ranges and defaults, bus layouts, state save/restore, and that the output stays finite
+across block sizes and parameter settings. Run them with the `unit`, `test` or `test-release`
+workflow (see [Commands](#commands)).
 
+Like pluginval, the tests are not part of a plain build: the `debug` workflow builds only the plugin.
+
+Add a `.cpp` file to `Tests/` and reconfigure to pick it up. `Tests/TestHelpers.h` has helpers for
+setting parameters and processing buffers. Set `-DENABLE_UNIT_TESTS=OFF` to skip them entirely.
 
 ## Validating the Plugin
 
 [pluginval](https://github.com/Tracktion/pluginval) loads the built plugin as a host would and
 tests it for stability. It is built from source on demand, so there is nothing to install.
 
-**Debug:**
 ```bash
-cmake --build --preset debug --target validate     # builds, then validates
-ctest --preset debug                               # validates an existing build
+cmake --workflow --preset test           # unit tests and pluginval, Debug
+cmake --workflow --preset test-release   # unit tests and pluginval, Release
 ```
 
-**Release:**
+The `validate` target runs pluginval on its own, skipping the unit tests:
+
 ```bash
-cmake --build --preset release --target validate
-ctest --preset release
+cmake --build --preset debug --target validate     # Debug
+cmake --build --preset release --target validate   # Release: validate this before shipping
 ```
 
 Logs land in `build-debug/pluginval-logs/`, or `build-release/pluginval-logs/` for a release run.
@@ -105,29 +130,27 @@ Strictness defaults to 10; use `-DPLUGINVAL_STRICTNESS=5` (range 1-10) for a fas
 
 Only VST3 and AU are validated; the standalone is skipped. The AU test validates the installed
 component in `~/Library/Audio/Plug-Ins/Components`, since macOS resolves Audio Units through its
-registry rather than by path - so it needs `COPY_PLUGIN_AFTER_BUILD` left on. Steinberg's VST3
+registry rather than by path - so it needs `PLUGIN_COPY_AFTER_BUILD` left on. Steinberg's VST3
 conformance validator is off by default, as it pulls ~300MB of SDK for one extra test; enable it
 with `-DPLUGINVAL_VST3_VALIDATOR=ON`.
+
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds the Release plugin on macOS and Windows
+and runs the unit tests. It only runs when started by hand: **Actions → CI → Run workflow** on
+GitHub, or `gh workflow run ci.yml`. Tick **Also run pluginval** (or pass `-f pluginval=true`) to
+validate the plugin too, which takes longer.
+
+Each run's page lists the plugins under **Artifacts** for 30 days: `SubBass-macOS.tar.gz` (VST3 and
+AU) and `SubBass-Windows.tar.gz` (VST3). They are unsigned.
 
 
 ## Debugging in Xcode
 
-### 1. Generate Xcode Project
-
-```bash
-cmake -B build-xcode -G Xcode
-open build-xcode/SubBass.xcodeproj
-```
-
-### 2. Configure Debugging
+Generate and open the project with the `xcode` preset (see [Commands](#commands)), then:
 
 1. Select your plugin target from the scheme dropdown
 2. Go to **Product → Scheme → Edit Scheme**
 3. Click **Run** on the left sidebar
-4. Under **Executable**, choose **Other** and navigate to executable.
-
-### 3. Build and Run
-
-1. Press **Cmd+B** to build the plugin
-2. Press **Cmd+R** to run with AudioPluginHost
-3. Load your plugin in AudioPluginHost
+4. Under **Executable**, choose **Other** and pick a host such as AudioPluginHost
+5. Press **Cmd+R** to build and run, then load SubBass in the host
