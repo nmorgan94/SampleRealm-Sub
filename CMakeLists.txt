@@ -4,7 +4,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "" FORCE)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "" FORCE)
 
 # Change to your project name
-project(SubBass)
+project(Sub)
 
 # Enables `ctest`
 enable_testing()
