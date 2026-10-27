@@ -4,7 +4,7 @@
 #include "Parameters.h"
 #include "PitchBendInput.h"
 #include "PresetManager.h"
-#include "dsp/SubBassVoice.h"
+#include "dsp/SubSynth.h"
 
 //==============================================================================
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
@@ -54,15 +54,11 @@ public:
     bool isOutputClipping() const { return clipHoldCounter.load (std::memory_order_relaxed) > 0; }
 
 private:
-    void handleMidiEvent (const juce::MidiMessage& message);
-    void removeHeldNote (int note);
-
     juce::AudioProcessorValueTreeState apvts { *this, nullptr, "Parameters",
                                                Parameters::createLayout() };
     PresetManager presetManager { apvts };
 
-    SubBassVoice voice;
-    std::vector<int> heldNotes;
+    SubSynth synth;
 
     PitchBendInput pitchBendInput { *apvts.getParameter (Parameters::pitchBendId.getParamID()) };
 

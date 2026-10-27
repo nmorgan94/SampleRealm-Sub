@@ -144,6 +144,20 @@ validate the plugin too, which takes longer.
 Each run's page lists the plugins under **Artifacts** for 30 days: `SubBass-macOS.tar.gz` (VST3 and
 AU) and `SubBass-Windows.tar.gz` (VST3). They are unsigned.
 
+## Web Demo and WebView Editor
+
+Needs Emscripten (`brew install emscripten`) and Node 24+.
+
+| Task | Command |
+|---|---|
+| Build and test the demo | `cd wasm && cmake --workflow --preset wasm` |
+| Serve the demo with live reload at http://localhost:8099 | `cd webui && npm run serve` |
+| Build the plugin with the WebView editor | `cmake --workflow --preset webview` |
+
+- Upload `wasm/build-wasm/SampleRealm-Sub-<version>/` to the asset bucket's `demos/`.
+  [`wasm.yml`](.github/workflows/wasm.yml) builds the same folder on GitHub.
+- The `webview` build installs over the native one; run the `release` workflow to switch back.
+- Delete `wasm/patches/juce-wasm.patch` once JUCE fixes its wasm support.
 
 ## Debugging in Xcode
 

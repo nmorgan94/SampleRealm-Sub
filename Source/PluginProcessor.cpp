@@ -1,6 +1,10 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include <algorithm>
+#include "shared/SynthSettings.h"
+
+#if SUB_WEBVIEW_EDITOR
+ #include "webview/WebViewEditor.h"
+#endif
 
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
@@ -88,7 +92,7 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     juce::ignoreUnused (samplesPerBlock);
-    voice.prepare (sampleRate);
+    synth.prepare (sampleRate);
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -125,59 +129,21 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    buffer.clear();
 
-    const auto paramValue = [this] (const juce::ParameterID& id) -> float
+    synth.setSettings (makeSynthSettings ([this] (const ParameterSpecs::Spec& spec) -> float
     {
-        return *apvts.getRawParameterValue (id.getParamID());
-    };
-
-    SubBassVoice::Params voiceParams;
-    voiceParams.octave = static_cast<int> (paramValue (Parameters::oscOctaveId));
-    voiceParams.osc1Fine = paramValue (Parameters::osc1FineId);
-    voiceParams.osc2Fine = paramValue (Parameters::osc2FineId);
-    voiceParams.oscMix = paramValue (Parameters::oscMixId);
-    voiceParams.envelope.attack = paramValue (Parameters::envAttackId);
-    voiceParams.envelope.decay = paramValue (Parameters::envDecayId);
-    voiceParams.envelope.sustain = paramValue (Parameters::envSustainId);
-    voiceParams.envelope.release = paramValue (Parameters::envReleaseId);
-    voiceParams.envelope.attackCurve = paramValue (Parameters::envAttackCurveId);
-    voiceParams.envelope.decayCurve = paramValue (Parameters::envDecayCurveId);
-    voiceParams.envelope.releaseCurve = paramValue (Parameters::envReleaseCurveId);
-    voiceParams.saturationDrive = paramValue (Parameters::saturationDriveId);
-    voiceParams.saturationDriveEnv = paramValue (Parameters::saturationDriveEnvId);
-    voiceParams.glideTime = paramValue (Parameters::glideTimeId);
-    voiceParams.glideMode = paramValue (Parameters::glideModeId) >= 0.5f ? GlideMode::fixedRate
-                                                                         : GlideMode::fixedTime;
-    voiceParams.pitchBendRange = paramValue (Parameters::pitchBendRangeId);
-    voice.setParameters (voiceParams);
+        return *apvts.getRawParameterValue (spec.id);
+    }));
 
     if (const auto bend = pitchBendInput.takeParameterChange())
-        voice.setPitchBend (*bend);
+        synth.setPitchBend (*bend);
 
-    int currentSample = 0;
+    synth.process (buffer, midiMessages);
 
+    // Keeps the bend parameter following the wheel
     for (const auto metadata : midiMessages)
-    {
-        if (metadata.samplePosition > currentSample)
-        {
-            voice.renderNextBlock (buffer, currentSample, metadata.samplePosition - currentSample);
-            currentSample = metadata.samplePosition;
-        }
-
-        handleMidiEvent (metadata.getMessage());
-    }
-
-    voice.renderNextBlock (buffer, currentSample, buffer.getNumSamples() - currentSample);
-
-    const float gainLinear = juce::Decibels::decibelsToGain (paramValue (Parameters::masterGainId), -60.0f);
-
-    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::FloatVectorOperations::multiply (channelData, gainLinear,
-                                               buffer.getNumSamples());
-    }
+        if (const auto message = metadata.getMessage(); message.isPitchWheel())
+            pitchBendInput.handlePitchWheel (message.getPitchWheelValue());
 
     const auto peak = buffer.getMagnitude (0, buffer.getNumSamples());
     outputPeakLevel.store (peak, std::memory_order_relaxed);
@@ -189,40 +155,6 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         clipHoldCounter.store (current - 1, std::memory_order_relaxed);
 }
 
-void AudioPluginAudioProcessor::handleMidiEvent (const juce::MidiMessage& message)
-{
-    if (message.isNoteOn())
-    {
-        const auto note = message.getNoteNumber();
-        removeHeldNote (note);
-        heldNotes.push_back (note);
-        voice.noteOn (note, heldNotes.size() == 1);
-    }
-    else if (message.isNoteOff())
-    {
-        removeHeldNote (message.getNoteNumber());
-
-        if (heldNotes.empty())
-            voice.noteOff();
-        else
-            voice.noteOn (heldNotes.back(), false);
-    }
-    else if (message.isAllNotesOff() || message.isAllSoundOff())
-    {
-        heldNotes.clear();
-        voice.noteOff();
-    }
-    else if (message.isPitchWheel())
-    {
-        voice.setPitchBend (pitchBendInput.handlePitchWheel (message.getPitchWheelValue()));
-    }
-}
-
-void AudioPluginAudioProcessor::removeHeldNote (int note)
-{
-    heldNotes.erase (std::remove (heldNotes.begin(), heldNotes.end(), note), heldNotes.end());
-}
-
 //==============================================================================
 bool AudioPluginAudioProcessor::hasEditor() const
 {
@@ -231,7 +163,11 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
 {
+   #if SUB_WEBVIEW_EDITOR
+    return new WebViewEditor (*this);
+   #else
     return new AudioPluginAudioProcessorEditor (*this);
+   #endif
 }
 
 //==============================================================================
