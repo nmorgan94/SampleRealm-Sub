@@ -43,7 +43,7 @@ test('decimal places follow the step, as AudioParameterFloat counts them', () =>
   assert.deepEqual([0.001, 0.1, 0.0001, 1].map(decimalPlaces), [3, 1, 4, 0]);
 });
 
-test('typed text parses as the plugin parses it, the Osc Mix split included', () => {
+test('typed text parses, the Osc Mix split included, and text without a number is ignored', () => {
   assert.equal(parseValue(param('oscMix'), '30 / 70'), 0.7);
   assert.equal(parseValue(param('envRelease'), '0.5'), 0.5);
   assert.equal(parseValue(param('envRelease'), '99'), 5);
