@@ -99,6 +99,7 @@ target_sources(${PROJECT_NAME} PRIVATE ${SourceFiles})
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE
         JUCE_WEB_BROWSER=$<BOOL:${SUB_WEBVIEW_EDITOR}>
+        SUB_WEBVIEW_EDITOR=$<BOOL:${SUB_WEBVIEW_EDITOR}>
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
@@ -111,6 +112,7 @@ if(SUB_WEBVIEW_EDITOR)
 
     file(GLOB_RECURSE uiInputs CONFIGURE_DEPENDS
         "${uiDir}/src/*" "${uiDir}/package*.json" "${uiDir}/vite.config.ts")
+    list(FILTER uiInputs EXCLUDE REGEX "/src/demo/")
 
     # npm writes this on every install
     set(npmInstalled "${uiDir}/node_modules/.package-lock.json")
@@ -136,7 +138,6 @@ if(SUB_WEBVIEW_EDITOR)
         SOURCES "${webUiZip}")
 
     target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_WebUI)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE SUB_WEBVIEW_EDITOR=1)
 
     if(APPLE)
         set_source_files_properties(Source/webview/WebViewEditor.cpp PROPERTIES COMPILE_OPTIONS -xobjective-c++)

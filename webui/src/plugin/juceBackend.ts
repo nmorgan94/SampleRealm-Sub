@@ -1,6 +1,6 @@
 // The C++ side of these names is Source/webview/WebViewEditor.cpp
 import { getNativeFunction, getSliderState } from '@juce-framework/webview';
-import type { Level, SubBackend, UiInfo } from '../backend.ts';
+import { paramLookup, type Level, type SubBackend, type UiInfo } from '../backend.ts';
 import { toProportion } from '../params.ts';
 
 const call = async <T>(name: string, ...args: unknown[]) => (await getNativeFunction(name)(...args)) as T;
@@ -11,13 +11,7 @@ type InitialisationData = { uiInfo: string[] };
 export function juceBackend(): SubBackend {
   const { uiInfo } = window.__JUCE__.initialisationData as unknown as InitialisationData;
   const info = JSON.parse(uiInfo[0]) as UiInfo;
-  const params = new Map(info.params.map((param) => [param.id, { param, slider: getSliderState(param.id) }]));
-
-  const entry = (id: string) => {
-    const found = params.get(id);
-    if (!found) throw new Error(`No parameter ${id}`);
-    return found;
-  };
+  const entry = paramLookup(new Map(info.params.map((param) => [param.id, { param, slider: getSliderState(param.id) }])));
 
   const param = (id: string) => entry(id).param;
   const slider = (id: string) => entry(id).slider;

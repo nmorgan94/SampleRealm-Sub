@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { localEnginePath } from '../webui/localEngine.ts';
 import { readUiInfo, stubImports } from '../webui/src/demo/workletBackend.ts';
 
 const sampleRate = 48000;
@@ -9,7 +10,7 @@ const noteOn = 0x90;
 const noteOff = 0x80;
 const pitchWheel = 0xe0;
 
-const wasm = new WebAssembly.Module(readFileSync(process.env.SUB_WASM));
+const wasm = new WebAssembly.Module(readFileSync(localEnginePath()));
 
 const paramIds = (exports) => readUiInfo(exports).params.map((p) => p.id);
 

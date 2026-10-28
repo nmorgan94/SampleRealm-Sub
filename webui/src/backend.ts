@@ -43,4 +43,10 @@ export interface SubBackend {
   presets: Presets;
 }
 
+export const paramLookup = <T>(entries: Map<string, T>) => (id: string) => {
+  const found = entries.get(id);
+  if (!found) throw new Error(`No parameter ${id}`);
+  return found;
+};
+
 export const INIT_PRESET = 'Init';

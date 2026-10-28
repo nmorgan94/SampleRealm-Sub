@@ -63,7 +63,7 @@ target_link_libraries(SubWeb PRIVATE juce::juce_audio_basics)
 target_link_options(SubWeb PRIVATE --no-entry -sSTANDALONE_WASM)
 
 set_target_properties(SubWeb PROPERTIES
-    OUTPUT_NAME "SampleRealm-Sub-${pluginVersion}"
+    OUTPUT_NAME "engine"
     SUFFIX ".wasm")
 
 find_program(NODE_EXECUTABLE node REQUIRED)
@@ -76,6 +76,7 @@ set(demoDir "${CMAKE_BINARY_DIR}/SampleRealm-Sub-${pluginVersion}")
 
 file(GLOB_RECURSE uiInputs CONFIGURE_DEPENDS
     "${uiDir}/src/*" "${uiDir}/public/demo/*" "${uiDir}/package*.json" "${uiDir}/vite.config.ts")
+list(FILTER uiInputs EXCLUDE REGEX "/src/plugin/")
 
 # npm writes this on every install
 set(npmInstalled "${uiDir}/node_modules/.package-lock.json")
@@ -111,5 +112,3 @@ add_test(NAME engine
 add_test(NAME ui
     COMMAND ${NPM_EXECUTABLE} test
     WORKING_DIRECTORY "${uiDir}")
-
-set_tests_properties(engine ui PROPERTIES ENVIRONMENT "SUB_WASM=$<TARGET_FILE:SubWeb>")

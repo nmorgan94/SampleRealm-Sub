@@ -1,4 +1,4 @@
-import { INIT_PRESET, type Level, type SubBackend, type UiInfo } from '../backend.ts';
+import { INIT_PRESET, paramLookup, type Level, type SubBackend, type UiInfo } from '../backend.ts';
 
 const PRESETS_KEY = 'samplerealm-sub-presets';
 
@@ -62,8 +62,8 @@ export type WorkletBackend = SubBackend & {
 };
 
 export function workletBackend(info: UiInfo): WorkletBackend {
-  const params = new Map(info.params.map((param, index) => [param.id, { param, index }]));
-  const values = new Map(info.params.map((param) => [param.id, param.defaultValue]));
+  const params = new Map(info.params.map((param, index) => [param.id, { param, index, value: param.defaultValue }]));
+  const entry = paramLookup(params);
   const listeners = new Map<string, Set<(value: number) => void>>();
   const levelListeners = new Set<(level: Level) => void>();
   let node: AudioWorkletNode | null = null;
@@ -72,14 +72,8 @@ export function workletBackend(info: UiInfo): WorkletBackend {
   let clipUntil = 0;
   let currentPreset = INIT_PRESET;
 
-  const entry = (id: string) => {
-    const found = params.get(id);
-    if (!found) throw new Error(`No parameter ${id}`);
-    return found;
-  };
-
   const notify = (id: string, value: number) => {
-    values.set(id, value);
+    entry(id).value = value;
     listeners.get(id)?.forEach((listener) => listener(value));
   };
 
@@ -109,7 +103,7 @@ export function workletBackend(info: UiInfo): WorkletBackend {
   return {
     info,
     param: (id) => entry(id).param,
-    getValue: (id) => values.get(id) ?? entry(id).param.defaultValue,
+    getValue: (id) => entry(id).value,
     setValue,
     beginGesture: () => {},
     endGesture: () => {},
@@ -136,7 +130,7 @@ export function workletBackend(info: UiInfo): WorkletBackend {
       },
       save: async (name) => {
         if (!name || name === INIT_PRESET) return false;
-        const saved = writePresets({ ...readPresets(), [name]: Object.fromEntries(values) });
+        const saved = writePresets({ ...readPresets(), [name]: Object.fromEntries(Array.from(params, ([id, { value }]) => [id, value])) });
         if (saved) currentPreset = name;
         return saved;
       },
@@ -159,7 +153,7 @@ export function workletBackend(info: UiInfo): WorkletBackend {
         levelListeners.forEach((listener) => listener(level));
       };
       // The engine starts at the plugin's defaults
-      values.forEach((value, id) => postParam(id, value));
+      params.forEach(({ value }, id) => postParam(id, value));
       pendingMidi.forEach((bytes) => audioNode.port.postMessage({ type: 'midi', bytes }));
       pendingMidi = [];
     },

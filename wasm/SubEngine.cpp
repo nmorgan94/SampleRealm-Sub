@@ -13,13 +13,9 @@ namespace
 
     constexpr auto numParams = static_cast<int> (ParameterSpecs::all.size());
 
-    constexpr int indexOf (const ParameterSpecs::Spec& spec)
+    constexpr auto indexOf (const ParameterSpecs::Spec& spec)
     {
-        for (int i = 0; i < numParams; ++i)
-            if (ParameterSpecs::all[static_cast<size_t> (i)] == &spec)
-                return i;
-
-        return -1;
+        return std::ranges::find (ParameterSpecs::all, &spec) - ParameterSpecs::all.begin();
     }
 
     auto defaultValues()

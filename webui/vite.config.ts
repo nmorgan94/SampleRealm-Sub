@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
-import { newestEngine } from './localEngine.ts';
+import { localEnginePath } from './localEngine.ts';
 
 const TARGETS = ['plugin', 'demo'];
 
@@ -13,7 +13,7 @@ const localEngine = (): Plugin => ({
   configureServer(server) {
     server.middlewares.use('/engine.wasm', (_, res) => {
       res.setHeader('Content-Type', 'application/wasm');
-      res.end(readFileSync(newestEngine()));
+      res.end(readFileSync(localEnginePath()));
     });
   },
 });
