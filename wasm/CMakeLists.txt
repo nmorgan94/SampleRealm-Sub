@@ -14,14 +14,18 @@ file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../CMakeLists.txt" pluginCMake)
 string(REGEX MATCH "\nproject\\(([A-Za-z0-9_-]+)" _ "${pluginCMake}")
 set(pluginName "${CMAKE_MATCH_1}")
 
-string(REGEX MATCH "juce_add_plugin[^)]*[ \t\r\n]COMPANY_NAME[ \t\r\n]+([A-Za-z0-9_-]+)" _ "${pluginCMake}")
-set(companyName "${CMAKE_MATCH_1}")
+string(REGEX MATCH "juce_add_plugin[^)]*[ \t\r\n]COMPANY_NAME[ \t\r\n]+(\"[^\"]*\"|[^ \t\r\n)]+)" _ "${pluginCMake}")
+string(REGEX REPLACE "^\"(.*)\"$" "\\1" companyName "${CMAKE_MATCH_1}")
 
 string(REGEX MATCH "juce_add_plugin[^)]*[ \t\r\n]VERSION[ \t\r\n]+([0-9]+\\.[0-9]+\\.[0-9]+)" _ "${pluginCMake}")
 set(pluginVersion "${CMAKE_MATCH_1}")
 
 if(NOT pluginName OR NOT companyName OR NOT pluginVersion)
     message(FATAL_ERROR "No project() name, or juce_add_plugin COMPANY_NAME or VERSION, found in ../CMakeLists.txt")
+endif()
+
+if(NOT companyName MATCHES "^[A-Za-z0-9_-]+$")
+    message(FATAL_ERROR "COMPANY_NAME names the demo folder, so it must be one word of letters, digits, - or _, not: ${companyName}")
 endif()
 
 project(${pluginName}Web LANGUAGES C CXX)
@@ -79,7 +83,10 @@ find_program(NPM_EXECUTABLE npm REQUIRED)
 set(uiDir "${CMAKE_CURRENT_SOURCE_DIR}/../webui")
 
 # Uploaded as demos/<this folder>/
-set(demoDir "${CMAKE_BINARY_DIR}/${companyName}-${pluginName}-${pluginVersion}")
+set(demoFolder "${companyName}-${pluginName}-${pluginVersion}")
+set(demoDir "${CMAKE_BINARY_DIR}/${demoFolder}")
+# For CI to name its artifact
+file(WRITE "${CMAKE_BINARY_DIR}/demo-folder" "${demoFolder}")
 
 file(GLOB_RECURSE uiInputs CONFIGURE_DEPENDS
     "${uiDir}/src/*" "${uiDir}/public/demo/*" "${uiDir}/package*.json" "${uiDir}/vite.config.ts")

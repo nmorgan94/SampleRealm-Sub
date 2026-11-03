@@ -155,7 +155,7 @@ Needs Emscripten (`brew install emscripten`) and Node 24+.
 | Build the plugin with the WebView editor | `cmake --workflow --preset webview` |
 
 - Upload `wasm/build-wasm/SampleRealm-Sub-<version>/` to the asset bucket's `demos/`.
-  [`wasm.yml`](.github/workflows/wasm.yml) builds the same folder on GitHub.
+  [`wasm.yml`](.github/workflows/wasm.yml) builds the same folder on GitHub as an artifact of that name.
 - The `webview` build installs over the native one; run the `release` workflow to switch back.
 - Delete `wasm/patches/juce-wasm.patch` once JUCE fixes its wasm support.
 
