@@ -16,6 +16,7 @@ private:
     void timerCallback() override;
 
     juce::WebBrowserComponent::Options createOptions();
+    juce::WebBrowserComponent::Options withPresetFunctions (const juce::WebBrowserComponent::Options&);
     std::optional<juce::WebBrowserComponent::Resource> getResource (const juce::String& url);
 
     AudioPluginAudioProcessor& processorRef;
@@ -30,6 +31,7 @@ private:
 
     float lastPeak = -1.0f;
     bool lastClipping = false;
+    juce::uint32 lastPresetChange = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WebViewEditor)
 };

@@ -11,6 +11,19 @@
   --color-accent: #2fe8c4;
   --color-fg: #d8dee6;
   --color-fg-dim: #7a828e;
+
+  /* For the shared header and overlays, as the native colour IDs in CustomLookAndFeel */
+  --color-header: transparent;
+  --color-title: var(--color-fg);
+  --color-overlay-dim: color-mix(in oklab, var(--color-background) 75%, transparent);
+  --color-overlay-panel: var(--color-panel);
+  --color-overlay-outline: var(--color-panel-border);
+  --color-input: var(--color-background);
+  --color-input-outline: var(--color-panel-border);
+  --color-input-focus: var(--color-accent);
+  --color-input-highlight: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  --color-scrollbar: var(--color-accent);
+
   --font-display: Orbitron, var(--font-sans);
   --text-3xs: 8px;
   --text-2xs: 10px;

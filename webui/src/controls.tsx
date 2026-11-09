@@ -1,5 +1,5 @@
 // Mirrors Source/ui/CustomLookAndFeel.cpp and its controls
-import { useId, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { ParamInfo, SubBackend } from './backend.ts';
 import { useParam, useShowValue } from './hooks.ts';
 import { formatValue, fromProportion, parseValue, snap, toProportion } from './params.ts';
@@ -341,8 +341,35 @@ export function TextButton({ className = '', ...props }: ComponentProps<'button'
   return (
     <button
       type="button"
-      className={`min-w-11 cursor-pointer rounded-md border border-panel-border bg-panel px-1.5 font-sans text-xs font-normal text-fg hover:bg-panel-hover ${className}`}
+      className={`cursor-pointer rounded-md border border-panel-border bg-panel px-1.5 font-sans text-xs font-normal text-fg hover:bg-panel-hover ${className}`}
       {...props}
     />
+  );
+}
+
+const MIN_SQUEEZE = 0.7;
+
+// As drawFittedText on one line: squeezed to fit, as far as 70% wide, then cut short with "…"
+export function FittedText({ text, width }: { text: string; width: number }) {
+  const span = useRef<HTMLSpanElement>(null);
+  const [squeeze, setSqueeze] = useState(1);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const natural = span.current?.scrollWidth ?? 0;
+      setSqueeze(natural > width ? Math.max(MIN_SQUEEZE, width / natural) : 1);
+    };
+    measure();
+    document.fonts?.ready.then(measure);
+  }, [text, width]);
+
+  return (
+    <span
+      ref={span}
+      className="inline-block shrink-0 origin-left overflow-hidden text-ellipsis whitespace-nowrap"
+      style={{ maxWidth: width / squeeze, transform: `scaleX(${squeeze})` }}
+    >
+      {text}
+    </span>
   );
 }

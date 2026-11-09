@@ -61,10 +61,14 @@ CPMAddPackage(
 
 add_executable(SubWeb
     SubEngine.cpp
+    BuildCommit.cpp
     ../Source/dsp/SubBassVoice.cpp
     ../Source/dsp/SubSynth.cpp)
 
 target_include_directories(SubWeb PRIVATE ../Source)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/BuildInfo.cmake)
+add_build_info(SubWeb)
 
 target_compile_definitions(SubWeb PRIVATE JUCE_STANDALONE_APPLICATION=1 SUB_PLUGIN_VERSION="${pluginVersion}")
 
@@ -89,7 +93,8 @@ set(demoDir "${CMAKE_BINARY_DIR}/${demoFolder}")
 file(WRITE "${CMAKE_BINARY_DIR}/demo-folder" "${demoFolder}")
 
 file(GLOB_RECURSE uiInputs CONFIGURE_DEPENDS
-    "${uiDir}/src/*" "${uiDir}/public/demo/*" "${uiDir}/package*.json" "${uiDir}/vite.config.ts")
+    "${uiDir}/src/*" "${uiDir}/public/demo/*" "${uiDir}/package*.json" "${uiDir}/vite.config.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/*")
 list(FILTER uiInputs EXCLUDE REGEX "/src/plugin/")
 
 # npm writes this on every install

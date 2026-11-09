@@ -1,23 +1,37 @@
 // Mirrors AudioPluginAudioProcessorEditor::resized()
-import { memo, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import type { SubBackend } from './backend.ts';
 import { IncDecButtons, LabeledCell, LinearSlider, PillToggle, Rotary } from './controls.tsx';
+import { EditorRootContext } from './editorRoot.ts';
 import { EnvelopeView } from './EnvelopeView.tsx';
-import { LevelMeter } from './LevelMeter.tsx';
+import { HeaderBar, type HeaderLayout } from './HeaderBar.tsx';
+import { useManual } from './ManualOverlay.tsx';
+import { MASTER_SECTION_WIDTH, MasterSection } from './MasterSection.tsx';
 import { PitchWheel } from './PitchWheel.tsx';
-import { PresetBar } from './PresetBar.tsx';
+import { usePrompt } from './PromptOverlay.tsx';
 
 export const EDITOR_WIDTH = 700;
 export const EDITOR_HEIGHT = 640;
 
-const TITLE_BAR_HEIGHT = 60;
+// AudioPluginAudioProcessorEditor::headerLayout
+const HEADER_LAYOUT: HeaderLayout = {
+  height: 60,
+  edge: 20,
+  titleWidth: 200,
+  titleHeight: 22,
+  gap: 20,
+  controlsHeight: 24,
+  meterWidth: MASTER_SECTION_WIDTH,
+  meterInset: 8,
+};
+
 const ROW_HEADER_HEIGHT = 22;
 const ROW_TITLES = ['OSCILLATOR', 'ENVELOPE', 'TONE & PITCH'];
 
-const ROW_HEIGHT = Math.floor((EDITOR_HEIGHT - TITLE_BAR_HEIGHT - 32) / 3);
+const ROW_HEIGHT = Math.floor((EDITOR_HEIGHT - HEADER_LAYOUT.height - 32) / 3);
 const ROW_X = 16;
 const ROW_WIDTH = EDITOR_WIDTH - 32;
-const rowY = (row: number) => TITLE_BAR_HEIGHT + 16 + row * ROW_HEIGHT + 4;
+const rowY = (row: number) => HEADER_LAYOUT.height + 16 + row * ROW_HEIGHT + 4;
 const PANEL_HEIGHT = ROW_HEIGHT - 8;
 
 const CONTENT_WIDTH = ROW_WIDTH - 20;
@@ -53,6 +67,10 @@ function Row({ row, children, background }: { row: number; children: ReactNode; 
 
 // The demo re-renders on every key press
 export const SubEditor = memo(function SubEditor({ backend }: { backend: SubBackend }) {
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const { prompt, overlay } = usePrompt();
+  const manual = useManual();
+
   const knob = (id: string, column: number, accessory?: { node: ReactNode; width: number; height: number }) => (
     <Cell column={column}>
       <LabeledCell
@@ -75,69 +93,74 @@ export const SubEditor = memo(function SubEditor({ backend }: { backend: SubBack
   });
 
   return (
-    <div className="relative overflow-hidden bg-linear-to-b from-background-top to-background-bottom font-display font-bold text-fg select-none" style={{ width: EDITOR_WIDTH, height: EDITOR_HEIGHT }}>
-      <header className="absolute inset-x-0 top-0 after:absolute after:inset-x-0 after:top-[59px] after:h-0.5 after:bg-accent/60" style={{ height: TITLE_BAR_HEIGHT }}>
-        <h1 className="absolute top-0 left-5 h-15 text-lg leading-15">SampleRealm: SUB</h1>
-        <PresetBar backend={backend} />
-        <span className="absolute left-[538px] h-15 w-[66px] text-right text-3xs leading-15 text-fg-dim">MASTER</span>
-        <div className="absolute top-2 left-[612px]">
-          <Rotary backend={backend} id="masterGain" size={44} popup />
-        </div>
-        <LevelMeter backend={backend} />
-      </header>
+    <EditorRootContext.Provider value={root}>
+      <div ref={setRoot} className="relative overflow-hidden bg-linear-to-b from-background-top to-background-bottom font-display font-bold text-fg select-none" style={{ width: EDITOR_WIDTH, height: EDITOR_HEIGHT }}>
+        <div className="absolute inset-x-0 h-0.5 bg-accent/60" style={{ top: HEADER_LAYOUT.height - 1 }} />
+        <HeaderBar
+          title="SampleRealm: SUB"
+          width={EDITOR_WIDTH}
+          layout={HEADER_LAYOUT}
+          backend={backend}
+          prompt={prompt}
+          showManual={manual.showManual}
+          meter={(bounds) => <MasterSection backend={backend} bounds={bounds} />}
+        />
 
-      <Row row={0}>
-        <Cell column={0}>
-          <LabeledCell
-            backend={backend}
-            id="oscOctave"
-            width={CELL_WIDTH}
-            height={CELL_HEIGHT}
-            control={(area, show) => (
-              <IncDecButtons
-                backend={backend}
-                id="oscOctave"
-                width={area.width}
-                onChange={() => {
-                  show.start();
-                  show.end();
-                }}
-              />
-            )}
-          />
-        </Cell>
-        {knob('osc1Fine', 1)}
-        <Cell column={2}>
-          <LabeledCell
-            backend={backend}
-            id="oscMix"
-            width={CELL_WIDTH}
-            height={CELL_HEIGHT}
-            control={(area, show) => (
-              <LinearSlider backend={backend} id="oscMix" width={area.width} height={area.height} onDragStart={show.start} onDragEnd={show.end} />
-            )}
-          />
-        </Cell>
-        {knob('osc2Fine', 3)}
-      </Row>
+        <Row row={0}>
+          <Cell column={0}>
+            <LabeledCell
+              backend={backend}
+              id="oscOctave"
+              width={CELL_WIDTH}
+              height={CELL_HEIGHT}
+              control={(area, show) => (
+                <IncDecButtons
+                  backend={backend}
+                  id="oscOctave"
+                  width={area.width}
+                  onChange={() => {
+                    show.start();
+                    show.end();
+                  }}
+                />
+              )}
+            />
+          </Cell>
+          {knob('osc1Fine', 1)}
+          <Cell column={2}>
+            <LabeledCell
+              backend={backend}
+              id="oscMix"
+              width={CELL_WIDTH}
+              height={CELL_HEIGHT}
+              control={(area, show) => (
+                <LinearSlider backend={backend} id="oscMix" width={area.width} height={area.height} onDragStart={show.start} onDragEnd={show.end} />
+              )}
+            />
+          </Cell>
+          {knob('osc2Fine', 3)}
+        </Row>
 
-      <Row row={1} background={<EnvelopeView backend={backend} width={CONTENT_WIDTH} height={CONTENT_HEIGHT} />}>
-        {knob('envAttack', 0, curveKnob('envAttackCurve'))}
-        {knob('envDecay', 1, curveKnob('envDecayCurve'))}
-        {knob('envSustain', 2)}
-        {knob('envRelease', 3, curveKnob('envReleaseCurve'))}
-      </Row>
+        <Row row={1} background={<EnvelopeView backend={backend} width={CONTENT_WIDTH} height={CONTENT_HEIGHT} />}>
+          {knob('envAttack', 0, curveKnob('envAttackCurve'))}
+          {knob('envDecay', 1, curveKnob('envDecayCurve'))}
+          {knob('envSustain', 2)}
+          {knob('envRelease', 3, curveKnob('envReleaseCurve'))}
+        </Row>
 
-      <Row row={2}>
-        <Cell column={0}>
-          <PitchWheel backend={backend} width={CELL_WIDTH} height={CELL_HEIGHT} />
-        </Cell>
-        {knob('saturationDrive', 1)}
-        {knob('saturationDriveEnv', 2)}
-        {knob('glideTime', 3, { node: <PillToggle backend={backend} id="glideMode" />, width: PILL_WIDTH, height: PILL_HEIGHT })}
-      </Row>
+        <Row row={2}>
+          <Cell column={0}>
+            <PitchWheel backend={backend} width={CELL_WIDTH} height={CELL_HEIGHT} />
+          </Cell>
+          {knob('saturationDrive', 1)}
+          {knob('saturationDriveEnv', 2)}
+          {knob('glideTime', 3, { node: <PillToggle backend={backend} id="glideMode" />, width: PILL_WIDTH, height: PILL_HEIGHT })}
+        </Row>
 
-      <span className="absolute right-2.5 bottom-3 text-3xs font-normal text-[#00d9ff]/40">{`v${backend.info.version}`}</span>
-    </div>
+        <span className="absolute right-2.5 bottom-3 text-3xs font-normal text-[#00d9ff]/40">{`v${backend.info.version}`}</span>
+        {overlay}
+        {manual.overlay}
+      </div>
+    </EditorRootContext.Provider>
   );
 });

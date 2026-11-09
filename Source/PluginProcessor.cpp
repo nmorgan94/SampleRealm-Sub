@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "shared/SynthSettings.h"
+#include <BinaryData.h>
 
 #if SUB_WEBVIEW_EDITOR
  #include "webview/WebViewEditor.h"
@@ -21,6 +22,35 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 {
+}
+
+PresetManager::Config AudioPluginAudioProcessor::createPresetConfig()
+{
+    PresetManager::Config config;
+    config.fileExtension = ".sub";
+    config.userDirectory = PresetManager::getDefaultUserDirectory (JucePlugin_Manufacturer, JucePlugin_Name);
+    config.author        = JucePlugin_Manufacturer;
+    config.formatVersion = Parameters::versionHint;
+
+    for (const auto* spec : ParameterSpecs::all)
+        if (spec->isPerformanceControl)
+            config.ignoredParameterIds.push_back (spec->id);
+
+    // Factory presets are embedded from Assets/Presets alongside the fonts
+    for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+    {
+        const auto* resource = BinaryData::namedResourceList[i];
+
+        if (! juce::String (BinaryData::getNamedResourceOriginalFilename (resource)).endsWithIgnoreCase (config.fileExtension))
+            continue;
+
+        int size = 0;
+
+        if (const auto* data = BinaryData::getNamedResource (resource, size))
+            config.factoryPresets.emplace_back (data, (size_t) size);
+    }
+
+    return config;
 }
 
 //==============================================================================
@@ -173,9 +203,11 @@ juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
 //==============================================================================
 void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    const auto state = apvts.copyState();
-    const auto xml   = state.createXml();
-    copyXmlToBinary (*xml, destData);
+    auto state = apvts.copyState();
+    presetManager.addPresetInfoTo (state);
+
+    if (const auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
 }
 
 void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -183,7 +215,7 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     const auto xml = getXmlFromBinary (data, sizeInBytes);
 
     if (xml != nullptr && xml->hasTagName (apvts.state.getType()))
-        apvts.replaceState (juce::ValueTree::fromXml (*xml));
+        presetManager.restoreState (juce::ValueTree::fromXml (*xml));
 }
 
 //==============================================================================

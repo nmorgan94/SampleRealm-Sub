@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Keyboard } from './Keyboard.tsx';
 import { qwertySemitone } from './qwerty.ts';
 import { EDITOR_HEIGHT, EDITOR_WIDTH, SubEditor } from '../SubEditor.tsx';
+import { factoryPresets } from './factoryPresets.ts';
 import { loadEngine, workletBackend, type WorkletBackend } from './workletBackend.ts';
 import { TextButton } from '../controls.tsx';
 import './styles.css';
@@ -15,6 +16,15 @@ const LOW_NOTE = 48;
 const NUM_KEYS = 25;
 
 const SIZE_MESSAGE = 'samplerealm-demo-size';
+
+// Blocked storage throws on access
+function browserStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -82,7 +92,7 @@ function Demo() {
 
   useEffect(() => {
     loadEngine(ENGINE_URL)
-      .then(({ wasm, info }) => setEngine({ backend: workletBackend(info), wasm }))
+      .then(({ wasm, info }) => setEngine({ backend: workletBackend(info, factoryPresets, browserStorage()), wasm }))
       .catch((error) => {
         console.error('Demo engine failed to load:', error);
         setStatus('failed');

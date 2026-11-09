@@ -1,128 +1,78 @@
-// Mirrors Source/ui/PresetComboBox.cpp
-import { useEffect, useState } from 'react';
-import { INIT_PRESET, type SubBackend } from './backend.ts';
+// Mirrors Source/ui/PresetBar.cpp
+import { useSyncExternalStore } from 'react';
+import { isSamePreset, type PresetBackend, type PresetEntry } from './backend.ts';
 import { TextButton } from './controls.tsx';
+import type { Rect } from './layout.ts';
+import { useMenu, type MenuItem } from './Menu.tsx';
+import type { PresetActions } from './presetActions.ts';
 
-const HEADING = 'mb-2 text-base font-bold';
-const TEXT = 'mb-3 text-sm text-fg-dim';
+// PresetBar::resized
+function layOut({ left, top, width, height }: Rect) {
+  const at = (x: number, w: number): Rect => ({ left: x, top, width: w, height });
+  const save = at(left + width - 48, 48);
+  const previous = at(left, 24);
+  const next = at(save.left - 8 - 24, 24);
+  const nameLeft = previous.left + previous.width + 4;
+  return { previous, next, save, name: at(nameLeft, next.left - 4 - nameLeft) };
+}
 
-type Dialog =
-  | { kind: 'save'; name: string }
-  | { kind: 'delete'; name: string }
-  | { kind: 'failed'; title: string; message: string };
+interface PresetBarProps {
+  presets: PresetBackend;
+  actions: PresetActions;
+  bounds: Rect;
+}
 
-export function PresetBar({ backend }: { backend: SubBackend }) {
-  const [current, setCurrent] = useState(INIT_PRESET);
-  const [menu, setMenu] = useState<string[] | null>(null);
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+export function PresetBar({ presets, actions, bounds }: PresetBarProps) {
+  const status = useSyncExternalStore(presets.onStatus, presets.status);
+  const menu = useMenu();
+  const layout = layOut(bounds);
 
-  useEffect(() => {
-    backend.presets.list().then(({ current }) => setCurrent(current || INIT_PRESET));
-  }, [backend]);
+  const showPresetMenu = async (button: HTMLElement) => {
+    const list = await presets.list();
+    const { current } = presets.status();
+    const item = (preset: PresetEntry): MenuItem => ({
+      kind: 'item',
+      label: preset.name,
+      ticked: isSamePreset(preset, current),
+      onSelect: () => void actions.load(preset),
+    });
 
-  const outcome = (succeeded: boolean, name: string, action: string, pastTense: string) => {
-    if (succeeded) setCurrent(name);
-    else setDialog({ kind: 'failed', title: `Couldn't ${action} Preset`, message: `"${name}" couldn't be ${pastTense}.` });
-  };
+    // Factory presets by category, user presets flat
+    const categories = new Map<string, PresetEntry[]>();
+    for (const preset of list.filter((p) => p.isFactory)) {
+      const category = preset.category || 'Other';
+      categories.set(category, [...(categories.get(category) ?? []), preset]);
+    }
+    const users = list.filter((preset) => !preset.isFactory);
 
-  const openMenu = async () => setMenu((await backend.presets.list()).names);
+    const next: MenuItem[] = [{ kind: 'header', label: 'Factory' }];
+    for (const category of [...categories.keys()].sort()) {
+      const entries = categories.get(category)!;
+      next.push({ kind: 'submenu', label: category, ticked: entries.some((p) => isSamePreset(p, current)), items: entries.map(item) });
+    }
+    if (categories.size === 0) next.push({ kind: 'item', label: 'No factory presets yet', disabled: true });
 
-  const load = async (name: string) => {
-    setMenu(null);
-    outcome(await backend.presets.load(name), name, 'Load', 'loaded');
-  };
+    next.push({ kind: 'header', label: 'User' }, ...users.map(item));
+    if (users.length === 0) next.push({ kind: 'item', label: 'No user presets yet', disabled: true });
 
-  const save = async (name: string) => {
-    setDialog(null);
-    const trimmed = name.trim();
-    if (trimmed) outcome(await backend.presets.save(trimmed), trimmed, 'Save', 'saved');
-  };
-
-  const remove = async (name: string) => {
-    setDialog(null);
-    await backend.presets.remove(name);
-    await backend.presets.load(INIT_PRESET);
-    setCurrent(INIT_PRESET);
+    menu.open(button, next);
   };
 
   return (
-    <div className="absolute top-4.5 left-[274px] flex h-6 gap-1.5 font-sans font-normal">
-      <button
-        type="button"
-        className="flex w-32.5 cursor-pointer items-center rounded-sm border border-panel-border bg-panel pl-1.5 text-left text-sm"
-        onClick={openMenu}
-        aria-haspopup="listbox"
-      >
-        <span className="flex-1 truncate">{current}</span>
-        <svg className="mx-2.5 flex-none" width="10" height="6" viewBox="0 0 10 6" aria-hidden>
-          <path d="M 1 1 L 5 5 L 9 1" fill="none" stroke="var(--color-accent)" strokeWidth="2" />
-        </svg>
-      </button>
-      <TextButton onClick={() => setDialog({ kind: 'save', name: current === INIT_PRESET ? '' : current })}>Save</TextButton>
-      <TextButton onClick={() => current.trim() && current !== INIT_PRESET && setDialog({ kind: 'delete', name: current })}>Delete</TextButton>
-
-      {menu && (
-        <>
-          <div className="fixed inset-0 z-20" onPointerDown={() => setMenu(null)} />
-          <ul className="absolute top-6.5 left-0 z-21 max-h-75 w-32.5 overflow-y-auto border border-panel-border bg-panel py-1" role="listbox">
-            {menu.map((name) => (
-              <li key={name} className="cursor-pointer px-2.5 py-0.5 text-sm hover:bg-accent/30" role="option" aria-selected={name === current} onClick={() => load(name)}>
-                {name}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {dialog && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/45">
-          <form
-            className="min-w-70 rounded-md border border-panel-border bg-panel p-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (dialog.kind === 'save') save(new FormData(e.currentTarget).get('presetName')?.toString() ?? '');
-              else if (dialog.kind === 'delete') remove(dialog.name);
-              else setDialog(null);
-            }}
-          >
-            {dialog.kind === 'save' && (
-              <>
-                <h2 className={HEADING}>Save Preset</h2>
-                <p className={TEXT}>Enter a name for this preset:</p>
-                <input
-                  className="mb-3 w-full rounded-sm border border-panel-border bg-background px-1.5 py-1 text-sm"
-                  name="presetName"
-                  defaultValue={dialog.name}
-                  autoFocus
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-              </>
-            )}
-            {dialog.kind === 'delete' && (
-              <>
-                <h2 className={HEADING}>Delete Preset</h2>
-                <p className={TEXT}>{`Delete preset "${dialog.name}"? This can't be undone.`}</p>
-              </>
-            )}
-            {dialog.kind === 'failed' && (
-              <>
-                <h2 className={HEADING}>{dialog.title}</h2>
-                <p className={TEXT}>{dialog.message}</p>
-              </>
-            )}
-            <div className="flex justify-end gap-1.5">
-              <TextButton type="submit" className="h-6.5" autoFocus={dialog.kind !== 'save'}>
-                {dialog.kind === 'save' ? 'Save' : dialog.kind === 'delete' ? 'Delete' : 'OK'}
-              </TextButton>
-              {dialog.kind !== 'failed' && (
-                <TextButton className="h-6.5" onClick={() => setDialog(null)}>
-                  Cancel
-                </TextButton>
-              )}
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
+    <>
+      <TextButton className="absolute" style={layout.previous} onClick={() => void presets.loadPrevious()}>
+        {'<'}
+      </TextButton>
+      <TextButton className="absolute truncate" style={layout.name} onClick={(e) => void showPresetMenu(e.currentTarget)}>
+        {status.current.name + (status.modified ? ' *' : '')}
+      </TextButton>
+      <TextButton className="absolute" style={layout.next} onClick={() => void presets.loadNext()}>
+        {'>'}
+      </TextButton>
+      <TextButton className="absolute" style={layout.save} onClick={() => void actions.save()}>
+        Save
+      </TextButton>
+      {menu.element}
+    </>
   );
 }

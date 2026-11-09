@@ -1,6 +1,6 @@
-import { INIT_PRESET, paramLookup, type Level, type SubBackend, type UiInfo } from '../backend.ts';
-
-const PRESETS_KEY = 'samplerealm-sub-presets';
+import { paramLookup, type Level, type SubBackend, type UiInfo } from '../backend.ts';
+import { localPresets, type PresetStorage } from './localPresets.ts';
+import { INIT_STATE, parseState, STORAGE_KEY, type PresetState } from './presetState.ts';
 
 // About the plugin's 30-block clip hold
 const CLIP_HOLD_MS = 400;
@@ -34,26 +34,6 @@ export async function loadEngine(url: string): Promise<{ wasm: ArrayBuffer; info
   return { wasm, info: readUiInfo(engine) };
 }
 
-type StoredPresets = Record<string, Record<string, number>>;
-
-// Storage can throw, e.g. in a private window
-const readPresets = (): StoredPresets => {
-  try {
-    return JSON.parse(localStorage.getItem(PRESETS_KEY) ?? '{}') as StoredPresets;
-  } catch {
-    return {};
-  }
-};
-
-const writePresets = (presets: StoredPresets) => {
-  try {
-    localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export type WorkletBackend = SubBackend & {
   noteOn(note: number): void;
   noteOff(note: number): void;
@@ -61,7 +41,7 @@ export type WorkletBackend = SubBackend & {
   attach(node: AudioWorkletNode): void;
 };
 
-export function workletBackend(info: UiInfo): WorkletBackend {
+export function workletBackend(info: UiInfo, factoryPresets: string[] = [], storage?: PresetStorage): WorkletBackend {
   const params = new Map(info.params.map((param, index) => [param.id, { param, index, value: param.defaultValue }]));
   const entry = paramLookup(params);
   const listeners = new Map<string, Set<(value: number) => void>>();
@@ -70,7 +50,6 @@ export function workletBackend(info: UiInfo): WorkletBackend {
   // Sent once the audio starts
   let pendingMidi: number[][] = [];
   let clipUntil = 0;
-  let currentPreset = INIT_PRESET;
 
   const notify = (id: string, value: number) => {
     entry(id).value = value;
@@ -79,14 +58,23 @@ export function workletBackend(info: UiInfo): WorkletBackend {
 
   const postParam = (id: string, value: number) => node?.port.postMessage({ type: 'param', index: entry(id).index, value });
 
-  const setValue = (id: string, value: number) => {
+  const apply = (id: string, value: number) => {
     postParam(id, value);
     notify(id, value);
   };
 
-  const applyAll = (next: Record<string, number>) => {
-    for (const param of info.params) setValue(param.id, next[param.id] ?? param.defaultValue);
-  };
+  const presets = localPresets<PresetState>({
+    storageKey: STORAGE_KEY,
+    storage,
+    factory: factoryPresets,
+    parse: parseState,
+    init: INIT_STATE,
+    capture: () => ({
+      values: Object.fromEntries(info.params.filter(({ isPerformanceControl }) => !isPerformanceControl).map(({ id }) => [id, entry(id).value])),
+    }),
+    // Ids this engine doesn't have are skipped, as the APVTS skips them
+    apply: ({ values }) => info.params.forEach(({ id, defaultValue }) => apply(id, values[id] ?? defaultValue)),
+  });
 
   const midi = (bytes: ArrayLike<number>) => {
     const [status, data1 = 0, data2 = 0] = Array.from(bytes);
@@ -102,9 +90,14 @@ export function workletBackend(info: UiInfo): WorkletBackend {
 
   return {
     info,
+    running: 'Web demo',
+    presets,
     param: (id) => entry(id).param,
     getValue: (id) => entry(id).value,
-    setValue,
+    setValue: (id, value) => {
+      apply(id, value);
+      if (!entry(id).param.isPerformanceControl) presets.markModified();
+    },
     beginGesture: () => {},
     endGesture: () => {},
     subscribe: (id, listener) => {
@@ -115,31 +108,6 @@ export function workletBackend(info: UiInfo): WorkletBackend {
     onLevel: (listener) => {
       levelListeners.add(listener);
       return () => levelListeners.delete(listener);
-    },
-    presets: {
-      list: async () => ({
-        names: [INIT_PRESET, ...Object.keys(readPresets()).sort((a, b) => a.localeCompare(b))],
-        current: currentPreset,
-      }),
-      load: async (name) => {
-        const stored = name === INIT_PRESET ? {} : readPresets()[name];
-        if (!stored) return false;
-        applyAll(stored);
-        currentPreset = name;
-        return true;
-      },
-      save: async (name) => {
-        if (!name || name === INIT_PRESET) return false;
-        const saved = writePresets({ ...readPresets(), [name]: Object.fromEntries(Array.from(params, ([id, { value }]) => [id, value])) });
-        if (saved) currentPreset = name;
-        return saved;
-      },
-      remove: async (name) => {
-        const presets = readPresets();
-        if (name === INIT_PRESET || !(name in presets)) return false;
-        delete presets[name];
-        return writePresets(presets);
-      },
     },
     noteOn: (note) => midi([NOTE_ON, note, VELOCITY]),
     noteOff: (note) => midi([NOTE_OFF, note, 0]),

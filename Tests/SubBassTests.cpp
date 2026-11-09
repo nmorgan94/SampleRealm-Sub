@@ -55,62 +55,45 @@ namespace
 }
 
 //==============================================================================
-TEST_CASE_METHOD (ProcessorFixture, "Every parameter starts at its default", "[parameters]")
+TEST_CASE_METHOD (ProcessorFixture, "Every parameter is built as its spec says and starts at its default", "[parameters]")
 {
-    for (auto* parameter : processor.getParameters())
+    for (const auto* spec : ParameterSpecs::all)
     {
-        CAPTURE (parameter->getName (100));
-        CHECK_THAT (parameter->getValue(), WithinAbs (parameter->getDefaultValue(), 1.0e-6));
-        CHECK (parameter->getDefaultValue() >= 0.0f);
-        CHECK (parameter->getDefaultValue() <= 1.0f);
-    }
-}
+        CAPTURE (spec->id);
 
-TEST_CASE_METHOD (ProcessorFixture, "Parameters have the expected ranges and defaults", "[parameters]")
-{
-    SECTION ("Float parameters")
-    {
-        const auto [paramID, minimum, maximum, defaultValue] = GENERATE (table<const char*, float, float, float> ({
-            { "masterGain",         -60.0f,  6.0f,  0.0f   },
-            { "osc1Fine",           -50.0f, 50.0f,  0.0f   },
-            { "osc2Fine",           -50.0f, 50.0f,  0.0f   },
-            { "oscMix",               0.0f,  1.0f,  0.5f   },
-            { "envAttack",            0.001f, 5.0f, 0.005f },
-            { "envDecay",             0.001f, 5.0f, 0.1f   },
-            { "envSustain",           0.0f,  1.0f,  0.8f   },
-            { "envRelease",           0.001f, 5.0f, 0.2f   },
-            { "envAttackCurve",      -1.0f,  1.0f,  0.0f   },
-            { "envDecayCurve",       -1.0f,  1.0f,  0.0f   },
-            { "envReleaseCurve",     -1.0f,  1.0f,  0.0f   },
-            { "saturationDrive",      0.0f,  1.0f,  0.2f   },
-            { "saturationDriveEnv",  -1.0f,  1.0f,  0.0f   },
-            { "glideTime",            0.0f,  1.0f,  0.0f   },
-            { "pitchBend",           -1.0f,  1.0f,  0.0f   },
-        }));
+        switch (spec->kind)
+        {
+            case ParameterSpecs::Kind::real:
+            {
+                auto* parameter = getTyped<juce::AudioParameterFloat> (processor, spec->id);
+                CHECK_THAT (parameter->range.start, WithinAbs (spec->min, 1.0e-6));
+                CHECK_THAT (parameter->range.end, WithinAbs (spec->max, 1.0e-6));
+                CHECK_THAT (parameter->range.interval, WithinAbs (spec->step, 1.0e-6));
+                CHECK_THAT (parameter->range.skew, WithinAbs (spec->skew, 1.0e-6));
+                CHECK_THAT (parameter->get(), WithinAbs (spec->defaultValue, 1.0e-6));
+                break;
+            }
 
-        CAPTURE (paramID);
-        auto* parameter = getTyped<juce::AudioParameterFloat> (processor, paramID);
-        CHECK_THAT (parameter->range.start, WithinAbs (minimum, 1.0e-6));
-        CHECK_THAT (parameter->range.end, WithinAbs (maximum, 1.0e-6));
-        CHECK_THAT (parameter->get(), WithinAbs (defaultValue, 1.0e-6));
-    }
+            case ParameterSpecs::Kind::integer:
+            {
+                auto* parameter = getTyped<juce::AudioParameterInt> (processor, spec->id);
+                CHECK (parameter->getRange() == juce::Range<int> (juce::roundToInt (spec->min), juce::roundToInt (spec->max)));
+                CHECK (parameter->get() == juce::roundToInt (spec->defaultValue));
+                break;
+            }
 
-    SECTION ("Integer parameters")
-    {
-        auto* octave = getTyped<juce::AudioParameterInt> (processor, "oscOctave");
-        CHECK (octave->getRange() == juce::Range<int> (-4, 0));
-        CHECK (octave->get() == -2);
+            case ParameterSpecs::Kind::choice:
+            {
+                juce::StringArray choices;
+                for (const auto* choice : spec->choices)
+                    choices.add (choice);
 
-        auto* bendRange = getTyped<juce::AudioParameterInt> (processor, "pitchBendRange");
-        CHECK (bendRange->getRange() == juce::Range<int> (0, 24));
-        CHECK (bendRange->get() == 2);
-    }
-
-    SECTION ("Glide Mode is a Time/Rate choice defaulting to Rate")
-    {
-        auto* parameter = getTyped<juce::AudioParameterChoice> (processor, "glideMode");
-        CHECK (parameter->choices == juce::StringArray { "Time", "Rate" });
-        CHECK (parameter->getIndex() == 1);
+                auto* parameter = getTyped<juce::AudioParameterChoice> (processor, spec->id);
+                CHECK (parameter->choices == choices);
+                CHECK (parameter->getIndex() == juce::roundToInt (spec->defaultValue));
+                break;
+            }
+        }
     }
 }
 
@@ -135,7 +118,7 @@ TEST_CASE_METHOD (ProcessorFixture, "State round trips into a new instance", "[s
     setParameter (processor, "envReleaseCurve", -0.75f);
     setParameter (processor, "oscOctave", -4.0f);
     setParameter (processor, "glideMode", 0.0f);
-    processor.getAPVTS().state.setProperty (PresetManager::currentPresetProperty, "Deep Sub", nullptr);
+    restoreSessionShowing (processor, "Deep Sub", true);
 
     juce::MemoryBlock state;
     processor.getStateInformation (state);
@@ -149,15 +132,20 @@ TEST_CASE_METHOD (ProcessorFixture, "State round trips into a new instance", "[s
     CHECK_THAT (getParameter (restored, "oscOctave"), WithinAbs (-4.0, 1.0e-6));
     CHECK_THAT (getParameter (restored, "glideMode"), WithinAbs (0.0, 1.0e-6));
 
-    // The preset name lives in the ValueTree rather than in a parameter
-    CHECK (restored.getPresetManager().getCurrentPresetName() == "Deep Sub");
+    const auto current = restored.getPresetManager().getCurrent();
+    CHECK (current.name == "Deep Sub");
+    CHECK_FALSE (current.isFactory);
+    CHECK (restored.getPresetManager().isModified());
+
+    // Kept by the preset manager, not left on the parameters
+    CHECK_FALSE (restored.getAPVTS().state.hasProperty ("presetName"));
 }
 
 TEST_CASE_METHOD (ProcessorFixture, "Invalid state is ignored", "[state]")
 {
     setParameter (processor, "masterGain", -3.0f);
     setParameter (processor, "pitchBendRange", 7.0f);
-    processor.getAPVTS().state.setProperty (PresetManager::currentPresetProperty, "Keep Me", nullptr);
+    restoreSessionShowing (processor, "Keep Me", false);
 
     SECTION ("Random bytes")
     {
@@ -179,7 +167,8 @@ TEST_CASE_METHOD (ProcessorFixture, "Invalid state is ignored", "[state]")
 
     CHECK_THAT (getParameter (processor, "masterGain"), WithinAbs (-3.0, 1.0e-4));
     CHECK_THAT (getParameter (processor, "pitchBendRange"), WithinAbs (7.0, 1.0e-6));
-    CHECK (processor.getPresetManager().getCurrentPresetName() == "Keep Me");
+    CHECK (processor.getPresetManager().getCurrent().name == "Keep Me");
+    CHECK_FALSE (processor.getPresetManager().isModified());
 }
 
 //==============================================================================

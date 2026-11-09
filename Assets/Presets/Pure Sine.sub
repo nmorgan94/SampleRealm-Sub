@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PRESET name="Pure Sine" category="Sub" author="SampleRealm" formatVersion="1">
+  <Parameters>
+    <PARAM id="masterGain" value="0.0"/>
+    <PARAM id="oscOctave" value="-2.0"/>
+    <PARAM id="osc1Fine" value="0.0"/>
+    <PARAM id="osc2Fine" value="0.0"/>
+    <PARAM id="oscMix" value="0.5"/>
+    <PARAM id="envAttack" value="0.005"/>
+    <PARAM id="envDecay" value="0.1"/>
+    <PARAM id="envSustain" value="1.0"/>
+    <PARAM id="envRelease" value="0.15"/>
+    <PARAM id="envAttackCurve" value="0.0"/>
+    <PARAM id="envDecayCurve" value="0.0"/>
+    <PARAM id="envReleaseCurve" value="0.0"/>
+    <PARAM id="saturationDrive" value="0.0"/>
+    <PARAM id="saturationDriveEnv" value="0.0"/>
+    <PARAM id="glideTime" value="0.0"/>
+    <PARAM id="glideMode" value="1.0"/>
+    <PARAM id="pitchBendRange" value="2.0"/>
+  </Parameters>
+</PRESET>

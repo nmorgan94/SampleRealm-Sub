@@ -4,7 +4,6 @@
 
 namespace
 {
-    constexpr int titleBarHeight = 60;
     constexpr int rowHeaderHeight = 22;
 }
 
@@ -44,22 +43,13 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                                    Parameters::pitchBendId.getParamID(),
                                    Parameters::pitchBendRangeId.getParamID());
 
-    masterGainSlider.setPopupDisplayEnabled (true, true, this);
-    addAndMakeVisible (masterGainSlider);
-    masterGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
-        processorRef.getAPVTS(), Parameters::masterGainId.getParamID(), masterGainSlider);
-    addAndMakeVisible (masterMeter);
+    addAndMakeVisible (header);
 
-    addAndMakeVisible (presetComboBox);
-    presetComboBox.setPresetManager (processorRef.getPresetManager());
+    prompt.setFont (juce::Font (CustomLookAndFeel::orbitronRegular()).withHeight (14.0f));
+    addChildComponent (prompt);
+    addChildComponent (manual);
 
-    savePresetButton.onClick = [this] { presetComboBox.promptToSavePreset(); };
-    addAndMakeVisible (savePresetButton);
-
-    deletePresetButton.onClick = [this] { presetComboBox.promptToDeletePreset(); };
-    addAndMakeVisible (deletePresetButton);
-
-    setSize (700, 640);
+    setSize (width, height);
     startTimerHz (30);
 }
 
@@ -70,8 +60,7 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
-    masterMeter.setLevel (processorRef.getOutputLevel());
-    masterMeter.setClipping (processorRef.isOutputClipping());
+    masterSection.setLevel (processorRef.getOutputLevel(), processorRef.isOutputClipping());
 
     auto& apvts = processorRef.getAPVTS();
     envelopeVisualizer.setADSR (*apvts.getRawParameterValue (Parameters::envAttackId.getParamID()),
@@ -124,13 +113,8 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     g.setGradientFill (backgroundGradient);
     g.fillRect (bounds);
 
-    auto titleBounds = getLocalBounds().removeFromTop (titleBarHeight).toFloat();
-    g.setColour (CustomLookAndFeel::text);
-    g.setFont (CustomLookAndFeel::boldFont (22.0f));
-    g.drawText ("SampleRealm: SUB", titleBounds.reduced (20.0f, 0.0f), juce::Justification::centredLeft);
-
     g.setColour (CustomLookAndFeel::accent.withAlpha (0.6f));
-    g.fillRect (juce::Rectangle<float> (0.0f, static_cast<float> (titleBarHeight - 1), bounds.getWidth(), 2.0f));
+    g.fillRect (juce::Rectangle<float> (0.0f, static_cast<float> (headerLayout.height - 1), bounds.getWidth(), 2.0f));
 
     for (int row = 0; row < numRows; ++row)
     {
@@ -148,11 +132,6 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
                     juce::Justification::centredLeft);
     }
 
-    auto masterLabelBounds = juce::Rectangle<int> (masterGainSlider.getX() - 74, 0, 66, titleBarHeight);
-    g.setColour (CustomLookAndFeel::textDim);
-    g.setFont (CustomLookAndFeel::boldFont (10.0f));
-    g.drawText ("MASTER", masterLabelBounds, juce::Justification::centredRight);
-
     g.setFont (juce::Font (CustomLookAndFeel::orbitronRegular()).withPointHeight (9.0f));
     g.setColour (juce::Colour (0xff00d9ff).withAlpha (0.4f));
     auto versionArea = juce::Rectangle<int> (getWidth() - 60, getHeight() - 23, 50, 12);
@@ -161,36 +140,8 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    constexpr int meterWidth = 14;
-    constexpr int meterHeight = 40;
-    constexpr int knobSize = 44;
-    constexpr int rightMargin = 20;
-    constexpr int gap = 10;
-
-    const int meterX = getWidth() - rightMargin - meterWidth;
-    masterMeter.setBounds (meterX, (titleBarHeight - meterHeight) / 2, meterWidth, meterHeight);
-
-    const int knobX = meterX - gap - knobSize;
-    masterGainSlider.setBounds (knobX, (titleBarHeight - knobSize) / 2, knobSize, knobSize);
-
-    constexpr int presetComboWidth = 130;
-    constexpr int presetButtonWidth = 44;
-    constexpr int presetControlHeight = 24;
-    constexpr int presetGap = 6;
-    constexpr int titleTextClearance = 260;
-
-    const int presetClusterWidth = presetComboWidth + presetGap + presetButtonWidth * 2 + presetGap;
-    const int masterSectionLeft = knobX - 74 - 20;
-    const int presetClusterX = titleTextClearance
-                              + juce::jmax (0, (masterSectionLeft - titleTextClearance - presetClusterWidth) / 2);
-    const int presetY = (titleBarHeight - presetControlHeight) / 2;
-
-    presetComboBox.setBounds (presetClusterX, presetY, presetComboWidth, presetControlHeight);
-    savePresetButton.setBounds (presetComboBox.getRight() + presetGap, presetY, presetButtonWidth, presetControlHeight);
-    deletePresetButton.setBounds (savePresetButton.getRight() + presetGap, presetY, presetButtonWidth, presetControlHeight);
-
     auto bounds = getLocalBounds();
-    bounds.removeFromTop (titleBarHeight);
+    header.setBounds (bounds.removeFromTop (headerLayout.height));
     bounds.reduce (16, 16);
 
     const int rowHeight = bounds.getHeight() / numRows;

@@ -19,6 +19,8 @@ namespace ParameterSpecs
         float skew = 1.0f;
         const char* unit = "";
         std::span<const char* const> choices = {};
+        // Played live: presets don't save it, and moving it isn't an edit
+        bool isPerformanceControl = false;
     };
 
     constexpr Spec integer (const char* id, const char* name, int min, int max, int defaultValue, const char* unit = "")
@@ -31,6 +33,12 @@ namespace ParameterSpecs
     {
         return { id, name, Kind::choice, 0.0f, static_cast<float> (choices.size() - 1),
                  static_cast<float> (defaultValue), 1.0f, 1.0f, "", choices };
+    }
+
+    constexpr Spec performanceControl (Spec spec)
+    {
+        spec.isPerformanceControl = true;
+        return spec;
     }
 
     inline constexpr const char* glideModes[] { "Time", "Rate" };
@@ -51,7 +59,7 @@ namespace ParameterSpecs
     inline constexpr Spec saturationDriveEnv { "saturationDriveEnv", "Drive Env", Kind::real, -1.0f, 1.0f, 0.0f, 0.001f };
     inline constexpr Spec glideTime          { "glideTime", "Glide", Kind::real, 0.0f, 1.0f, 0.0f, 0.001f, 0.3f, "s" };
     inline constexpr Spec glideMode          = choice ("glideMode", "Glide Mode", glideModes, 1);
-    inline constexpr Spec pitchBend          { "pitchBend", "Pitch Bend", Kind::real, -1.0f, 1.0f, 0.0f, 0.0001f };
+    inline constexpr Spec pitchBend          = performanceControl ({ "pitchBend", "Pitch Bend", Kind::real, -1.0f, 1.0f, 0.0f, 0.0001f });
     inline constexpr Spec pitchBendRange     = integer ("pitchBendRange", "Bend Range", 0, 24, 2, "st");
 
     // The host's parameter order

@@ -2,7 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "PluginProcessor.h"
+#include "PluginEditor.h"
 
 //==============================================================================
 namespace TestHelpers
@@ -87,5 +87,26 @@ namespace TestHelpers
         // Parameters notify listeners on the message thread, so JUCE must be initialised
         juce::ScopedJuceInitialiser_GUI juceInitialiser;
         AudioPluginAudioProcessor processor;
+    };
+
+    // The current parameters, restored as a session saved while a user preset showed,
+    // with the properties PresetManager::addPresetInfoTo writes
+    inline void restoreSessionShowing (AudioPluginAudioProcessor& processor, const juce::String& presetName, bool modified)
+    {
+        auto state = processor.getAPVTS().copyState();
+        state.setProperty ("presetName", presetName, nullptr);
+        state.setProperty ("presetCategory", "", nullptr);
+        state.setProperty ("presetIsFactory", false, nullptr);
+        state.setProperty ("presetModified", modified, nullptr);
+        processor.getPresetManager().restoreState (state);
+    }
+
+    // A parent the editor's size, for overlays
+    struct OverlayFixture
+    {
+        OverlayFixture()   { parent.setSize (AudioPluginAudioProcessorEditor::width, AudioPluginAudioProcessorEditor::height); }
+
+        juce::ScopedJuceInitialiser_GUI juceInitialiser;
+        juce::Component parent;
     };
 }

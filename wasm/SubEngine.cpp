@@ -6,6 +6,9 @@
 #include "dsp/DriveEnvelopeModulation.h"
 #include "dsp/SubSynth.h"
 
+// BuildCommit.cpp
+extern const char* const buildCommit;
+
 //==============================================================================
 namespace
 {
@@ -46,7 +49,7 @@ namespace
 
 EXPORT (uiInfo) const char* uiInfo()
 {
-    static const auto json = uiInfoJson (SUB_PLUGIN_VERSION);
+    static const auto json = uiInfoJson (SUB_PLUGIN_VERSION, buildCommit);
     return json.c_str();
 }
 

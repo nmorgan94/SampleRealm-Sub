@@ -52,13 +52,13 @@ test('the ui info carries the version and every parameter as ParameterSpecs defi
   const info = readUiInfo(engine());
 
   assert.match(info.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(info.params.length, 18);
-  assert.equal(new Set(info.params.map((p) => p.id)).size, 18);
+  assert.equal(new Set(info.params.map((p) => p.id)).size, info.params.length);
   assert.deepEqual(info.params.find((p) => p.id === 'envRelease'), {
     id: 'envRelease', name: 'Release', kind: 'real', min: 0.001, max: 5, defaultValue: 0.2,
-    step: 0.001, skew: 0.3, unit: 's', choices: [],
+    step: 0.001, skew: 0.3, unit: 's', choices: [], isPerformanceControl: false,
   });
   assert.deepEqual(info.params.find((p) => p.id === 'glideMode').choices, ['Time', 'Rate']);
+  assert.deepEqual(info.params.filter((p) => p.isPerformanceControl).map((p) => p.id), ['pitchBend']);
 });
 
 test('a held note sounds, finite and within full scale, an octave down with drive', () => {

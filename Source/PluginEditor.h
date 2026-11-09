@@ -1,19 +1,28 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "ui/About.h"
 #include "ui/CustomLookAndFeel.h"
 #include "ui/EnvelopeVisualizer.h"
+#include "ui/HeaderBar.h"
 #include "ui/LabeledSlider.h"
-#include "ui/LevelMeter.h"
+#include "ui/Manual.h"
+#include "ui/MasterSection.h"
 #include "ui/PillButton.h"
 #include "ui/PitchWheel.h"
-#include "ui/PresetComboBox.h"
+#include "ui/PromptOverlay.h"
 
 //==============================================================================
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               private juce::Timer
 {
 public:
+    static constexpr int width = 700, height = 640;
+
+    // As HEADER_LAYOUT in webui/src/SubEditor.tsx
+    static constexpr HeaderBar::Layout headerLayout { .height = 60, .edge = 20, .titleWidth = 200, .titleHeight = 22.0f,
+                                                      .gap = 20, .controlsHeight = 24, .meterWidth = MasterSection::preferredWidth, .meterInset = 8 };
+
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
     ~AudioPluginAudioProcessorEditor() override;
 
@@ -46,14 +55,11 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> glideModeAttachment;
     PitchWheel pitchWheel;
 
-    PresetComboBox presetComboBox;
-    juce::TextButton savePresetButton { "Save" };
-    juce::TextButton deletePresetButton { "Delete" };
-
-    // Master gain lives in the title bar, not the parameter grid, so it's wired up separately.
-    juce::Slider masterGainSlider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> masterGainAttachment;
-    LevelMeter masterMeter;
+    PromptOverlay prompt;
+    ManualOverlay manual;
+    MasterSection masterSection { processorRef.getAPVTS(), Parameters::masterGainId.getParamID(), *this };
+    HeaderBar header { "SampleRealm: SUB", headerLayout, processorRef.getPresetManager(), prompt, [this] { manual.show(); },
+                       About::text (processorRef), masterSection };
 
     static constexpr int numColumns = 4;
     static constexpr int numRows = 3;

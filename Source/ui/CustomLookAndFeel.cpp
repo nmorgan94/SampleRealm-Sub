@@ -1,4 +1,6 @@
 #include "CustomLookAndFeel.h"
+#include "HeaderBar.h"
+#include "ModalOverlay.h"
 #include <BinaryData.h>
 
 //==============================================================================
@@ -13,15 +15,27 @@ CustomLookAndFeel::CustomLookAndFeel()
     setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     setColour (juce::Label::textColourId, textDim);
 
-    setColour (juce::ComboBox::backgroundColourId, panel);
     setColour (juce::ComboBox::outlineColourId, panelBorder);
-    setColour (juce::ComboBox::textColourId, text);
-    setColour (juce::ComboBox::arrowColourId, accent);
     setColour (juce::TextButton::buttonColourId, panel);
     setColour (juce::TextButton::textColourOffId, text);
     setColour (juce::PopupMenu::backgroundColourId, panel);
     setColour (juce::PopupMenu::textColourId, text);
     setColour (juce::PopupMenu::highlightedBackgroundColourId, accent.withAlpha (0.3f));
+
+    // The editor's gradient shows through
+    setColour (HeaderBar::backgroundColourId, juce::Colours::transparentBlack);
+    setColour (HeaderBar::titleColourId, text);
+
+    setColour (ModalOverlay::dimColourId, background.withAlpha (0.75f));
+    setColour (ModalOverlay::panelColourId, panel);
+    setColour (ModalOverlay::outlineColourId, panelBorder);
+    setColour (juce::TextEditor::backgroundColourId, background);
+    setColour (juce::TextEditor::textColourId, text);
+    setColour (juce::TextEditor::outlineColourId, panelBorder);
+    setColour (juce::TextEditor::focusedOutlineColourId, accent);
+    setColour (juce::TextEditor::highlightColourId, accent.withAlpha (0.4f));
+    setColour (juce::CaretComponent::caretColourId, accent);
+    setColour (juce::ScrollBar::thumbColourId, accent);
 }
 
 juce::Font CustomLookAndFeel::getLabelFont (juce::Label&)
