@@ -23,6 +23,13 @@
   --color-input-focus: var(--color-accent);
   --color-input-highlight: color-mix(in oklab, var(--color-accent) 40%, transparent);
   --color-scrollbar: var(--color-accent);
+  --color-widget: var(--color-panel);
+  --color-line: var(--color-panel-border);
+  --color-thumb: var(--color-accent);
+  --color-clip: red;
+  --color-meter-background: var(--color-panel);
+  --color-menu: var(--color-panel);
+  --color-menu-highlight: color-mix(in oklab, var(--color-accent) 30%, transparent);
 
   --font-display: Orbitron, var(--font-sans);
   --text-3xs: 8px;

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { driveEnvelopeModulation, shapeProgress } from '../src/curves.ts';
-import { engine } from './engine.ts';
+import { engine as freshEngine } from './engine.ts';
+
+// The wasm's own exports, for the maths it exports
+const { engine } = freshEngine();
 
 // The C++ uses floats
 const close = (a: number, b: number) => Math.abs(a - b) < 1e-5;

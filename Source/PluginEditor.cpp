@@ -15,25 +15,25 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     addAndMakeVisible (envelopeVisualizer);
 
-    addControl (Parameters::oscOctaveId.getParamID(), "Octave", juce::Slider::IncDecButtons);
-    addControl (Parameters::osc1FineId.getParamID(), "Osc 1 Fine");
-    addControl (Parameters::oscMixId.getParamID(), "Osc Mix", juce::Slider::LinearHorizontal);
-    addControl (Parameters::osc2FineId.getParamID(), "Osc 2 Fine");
+    addCell (Parameters::oscOctaveId.getParamID(), "Octave", juce::Slider::IncDecButtons);
+    addKnob (Parameters::osc1FineId.getParamID(), "Osc 1 Fine");
+    addCell (Parameters::oscMixId.getParamID(), "Osc Mix", juce::Slider::LinearHorizontal);
+    addKnob (Parameters::osc2FineId.getParamID(), "Osc 2 Fine");
 
-    addCurveKnob (addControl (Parameters::envAttackId.getParamID(), "Attack"),
+    addCurveKnob (addCell (Parameters::envAttackId.getParamID(), "Attack"),
                   Parameters::envAttackCurveId.getParamID());
-    addCurveKnob (addControl (Parameters::envDecayId.getParamID(), "Decay"),
+    addCurveKnob (addCell (Parameters::envDecayId.getParamID(), "Decay"),
                   Parameters::envDecayCurveId.getParamID());
-    addControl (Parameters::envSustainId.getParamID(), "Sustain");
-    addCurveKnob (addControl (Parameters::envReleaseId.getParamID(), "Release"),
+    addKnob (Parameters::envSustainId.getParamID(), "Sustain");
+    addCurveKnob (addCell (Parameters::envReleaseId.getParamID(), "Release"),
                   Parameters::envReleaseCurveId.getParamID());
 
-    addControl (Parameters::saturationDriveId.getParamID(), "Drive");
-    addControl (Parameters::saturationDriveEnvId.getParamID(), "Drive Env");
+    addKnob (Parameters::saturationDriveId.getParamID(), "Drive");
+    addKnob (Parameters::saturationDriveEnvId.getParamID(), "Drive Env");
     constexpr int glideModePillWidth = 52;
     constexpr int glideModePillHeight = 15;
 
-    addControl (Parameters::glideTimeId.getParamID(), "Glide")
+    addCell (Parameters::glideTimeId.getParamID(), "Glide")
         .setAccessory (glideModeButton, glideModePillWidth, glideModePillHeight);
     glideModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processorRef.getAPVTS(), Parameters::glideModeId.getParamID(), glideModeButton);
@@ -45,7 +45,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     addAndMakeVisible (header);
 
-    prompt.setFont (juce::Font (CustomLookAndFeel::orbitronRegular()).withHeight (14.0f));
     addChildComponent (prompt);
     addChildComponent (manual);
 
@@ -60,8 +59,6 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
-    masterSection.setLevel (processorRef.getOutputLevel(), processorRef.isOutputClipping());
-
     auto& apvts = processorRef.getAPVTS();
     envelopeVisualizer.setADSR (*apvts.getRawParameterValue (Parameters::envAttackId.getParamID()),
                                 *apvts.getRawParameterValue (Parameters::envDecayId.getParamID()),
@@ -75,20 +72,34 @@ void AudioPluginAudioProcessorEditor::timerCallback()
 }
 
 //==============================================================================
-LabeledSlider& AudioPluginAudioProcessorEditor::addControl (
-    const juce::String& paramId, const juce::String& labelText, juce::Slider::SliderStyle style)
+void AudioPluginAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::String& labelText)
 {
-    auto control = std::make_unique<LabeledSlider> (style);
+    auto knob = std::make_unique<LabeledSlider>();
 
-    control->setLabelText (labelText);
-    control->attachToParameter (processorRef.getAPVTS(), paramId);
-    addAndMakeVisible (*control);
+    knob->setLabelText (labelText);
+    knob->setNameHeight (ParameterCell::nameHeight);
+    knobAttachments.push_back (std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processorRef.getAPVTS(), paramId, knob->getSlider()));
+    addAndMakeVisible (*knob);
 
-    controls.push_back (std::move (control));
-    return *controls.back();
+    controls.push_back (std::move (knob));
 }
 
-void AudioPluginAudioProcessorEditor::addCurveKnob (LabeledSlider& owner, const juce::String& paramId)
+ParameterCell& AudioPluginAudioProcessorEditor::addCell (
+    const juce::String& paramId, const juce::String& labelText, juce::Slider::SliderStyle style)
+{
+    auto cell = std::make_unique<ParameterCell> (style);
+    auto& added = *cell;
+
+    cell->setLabelText (labelText);
+    cell->attachToParameter (processorRef.getAPVTS(), paramId);
+    addAndMakeVisible (*cell);
+
+    controls.push_back (std::move (cell));
+    return added;
+}
+
+void AudioPluginAudioProcessorEditor::addCurveKnob (ParameterCell& owner, const juce::String& paramId)
 {
     constexpr int curveKnobSize = 32;
 

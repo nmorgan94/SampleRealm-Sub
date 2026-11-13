@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { workletBackend } from '../../src/demo/workletBackend.ts';
+import { demoBackend } from '../../src/demo/demoBackend.ts';
 import { info } from '../engine.ts';
 
 test('a MIDI pitch wheel moves the on-screen wheel across its full range, as in the plugin', () => {
-  const backend = workletBackend(info);
+  const backend = demoBackend(info);
   const bends: number[] = [];
   backend.subscribe('pitchBend', (value) => bends.push(value));
 
@@ -17,7 +17,7 @@ test('a MIDI pitch wheel moves the on-screen wheel across its full range, as in 
 });
 
 test('other MIDI leaves the wheel alone', () => {
-  const backend = workletBackend(info);
+  const backend = demoBackend(info);
   let moved = false;
   backend.subscribe('pitchBend', () => (moved = true));
 

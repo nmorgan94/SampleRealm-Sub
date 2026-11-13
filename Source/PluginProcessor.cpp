@@ -3,8 +3,8 @@
 #include "shared/SynthSettings.h"
 #include <BinaryData.h>
 
-#if SUB_WEBVIEW_EDITOR
- #include "webview/WebViewEditor.h"
+#if PLUGIN_WEBVIEW_EDITOR
+ #include <webview_editor/webview_editor.h>
 #endif
 
 //==============================================================================
@@ -31,10 +31,7 @@ PresetManager::Config AudioPluginAudioProcessor::createPresetConfig()
     config.userDirectory = PresetManager::getDefaultUserDirectory (JucePlugin_Manufacturer, JucePlugin_Name);
     config.author        = JucePlugin_Manufacturer;
     config.formatVersion = Parameters::versionHint;
-
-    for (const auto* spec : ParameterSpecs::all)
-        if (spec->isPerformanceControl)
-            config.ignoredParameterIds.push_back (spec->id);
+    config.ignoredParameterIds = PresetManager::performanceControlIds (ParameterSpecs::all);
 
     // Factory presets are embedded from Assets/Presets alongside the fonts
     for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
@@ -175,14 +172,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if (const auto message = metadata.getMessage(); message.isPitchWheel())
             pitchBendInput.handlePitchWheel (message.getPitchWheelValue());
 
-    const auto peak = buffer.getMagnitude (0, buffer.getNumSamples());
-    outputPeakLevel.store (peak, std::memory_order_relaxed);
-
-    constexpr int clipHoldBlocks = 30;
-    if (peak > 1.0f)
-        clipHoldCounter.store (clipHoldBlocks, std::memory_order_relaxed);
-    else if (const auto current = clipHoldCounter.load (std::memory_order_relaxed); current > 0)
-        clipHoldCounter.store (current - 1, std::memory_order_relaxed);
+    outputMeter.process (buffer);
 }
 
 //==============================================================================
@@ -193,8 +183,14 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
 {
-   #if SUB_WEBVIEW_EDITOR
-    return new WebViewEditor (*this);
+   #if PLUGIN_WEBVIEW_EDITOR
+    return new WebViewEditor (*this, { .specs = ParameterSpecs::all,
+                                       .parameters = apvts,
+                                       .presets = &presetManager,
+                                       .meter = &outputMeter,
+                                       .width = AudioPluginAudioProcessorEditor::width,
+                                       .height = AudioPluginAudioProcessorEditor::height,
+                                       .background = CustomLookAndFeel::background });
    #else
     return new AudioPluginAudioProcessorEditor (*this);
    #endif

@@ -2,19 +2,14 @@
 #include "CustomLookAndFeel.h"
 
 MasterSection::MasterSection (juce::AudioProcessorValueTreeState& apvts, const juce::String& gainParamId,
-                              juce::Component& popupParent)
-    : gainAttachment (apvts, gainParamId, gainKnob)
+                              PeakMeter& outputMeter, juce::Component& popupParent)
+    : gainAttachment (apvts, gainParamId, gainKnob),
+      meter (outputMeter)
 {
     gainKnob.setPopupDisplayEnabled (true, true, &popupParent);
 
     addAndMakeVisible (gainKnob);
     addAndMakeVisible (meter);
-}
-
-void MasterSection::setLevel (float linearLevel, bool isClipping)
-{
-    meter.setLevel (linearLevel);
-    meter.setClipping (isClipping);
 }
 
 void MasterSection::paint (juce::Graphics& g)

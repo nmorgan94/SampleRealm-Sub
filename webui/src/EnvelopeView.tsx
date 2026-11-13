@@ -1,8 +1,8 @@
 // Mirrors Source/ui/EnvelopeVisualizer.cpp
 import { useId } from 'react';
+import { useParam } from '@samplerealm/modules/editor/hooks.ts';
 import type { SubBackend } from './backend.ts';
 import { driveEnvelopeModulation, shapeProgress, timeToWidthFraction } from './curves.ts';
-import { useParam } from './hooks.ts';
 
 const SUSTAIN_FRACTION = 0.3;
 const STEPS_PER_SEGMENT = 24;

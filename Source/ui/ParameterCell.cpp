@@ -1,7 +1,7 @@
-#include "LabeledSlider.h"
+#include "ParameterCell.h"
 
 //==============================================================================
-LabeledSlider::LabeledSlider (juce::Slider::SliderStyle style)
+ParameterCell::ParameterCell (juce::Slider::SliderStyle style)
     : slider (style, juce::Slider::NoTextBox)
 {
     addAndMakeVisible (slider);
@@ -25,19 +25,20 @@ LabeledSlider::LabeledSlider (juce::Slider::SliderStyle style)
 
     slider.addMouseListener (this, false);
 
+    label.setFont (juce::FontOptions (nameHeight, juce::Font::bold));
     label.setJustificationType (juce::Justification::centred);
     label.addListener (this);
     addAndMakeVisible (label);
 }
 
-void LabeledSlider::attachToParameter (juce::AudioProcessorValueTreeState& apvts, const juce::String& paramId)
+void ParameterCell::attachToParameter (juce::AudioProcessorValueTreeState& apvts, const juce::String& paramId)
 {
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (apvts, paramId, slider);
 
     slider.setDoubleClickReturnValue (false, 0.0);
 }
 
-void LabeledSlider::parentHierarchyChanged()
+void ParameterCell::parentHierarchyChanged()
 {
     // The slider bakes in look-and-feel-dependent child components (e.g. IncDecButtons)
     // at construction time, before this component is parented and can resolve the real
@@ -45,7 +46,7 @@ void LabeledSlider::parentHierarchyChanged()
     slider.sendLookAndFeelChange();
 }
 
-void LabeledSlider::mouseDoubleClick (const juce::MouseEvent&)
+void ParameterCell::mouseDoubleClick (const juce::MouseEvent&)
 {
     stopTimer();
     isDragging = false;
@@ -53,19 +54,19 @@ void LabeledSlider::mouseDoubleClick (const juce::MouseEvent&)
     label.showEditor();
 }
 
-void LabeledSlider::editorHidden (juce::Label*, juce::TextEditor& editor)
+void ParameterCell::editorHidden (juce::Label*, juce::TextEditor& editor)
 {
     slider.setValue (slider.getValueFromText (editor.getText()), juce::sendNotificationSync);
     showName();
 }
 
-void LabeledSlider::setLabelText (const juce::String& newText)
+void ParameterCell::setLabelText (const juce::String& newText)
 {
     nameText = newText;
     showName();
 }
 
-void LabeledSlider::setAccessory (juce::Component& component, int width, int height)
+void ParameterCell::setAccessory (juce::Component& component, int width, int height)
 {
     accessory = &component;
     accessoryWidth = width;
@@ -75,23 +76,23 @@ void LabeledSlider::setAccessory (juce::Component& component, int width, int hei
     resized();
 }
 
-void LabeledSlider::timerCallback()
+void ParameterCell::timerCallback()
 {
     stopTimer();
     showName();
 }
 
-void LabeledSlider::showCurrentValue()
+void ParameterCell::showCurrentValue()
 {
     label.setText (slider.getTextFromValue (slider.getValue()), juce::dontSendNotification);
 }
 
-void LabeledSlider::showName()
+void ParameterCell::showName()
 {
     label.setText (nameText, juce::dontSendNotification);
 }
 
-void LabeledSlider::resized()
+void ParameterCell::resized()
 {
     auto bounds = getLocalBounds();
 

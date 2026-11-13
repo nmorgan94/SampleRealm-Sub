@@ -1,14 +1,16 @@
 // Mirrors AudioPluginAudioProcessorEditor::resized()
 import { memo, useState, type ReactNode } from 'react';
+import { EditorRootContext } from '@samplerealm/modules/editor/editorRoot.ts';
+import { HeaderBar, type HeaderLayout } from '@samplerealm/modules/editor/HeaderBar.tsx';
+import { LabeledSlider } from '@samplerealm/modules/editor/LabeledSlider.tsx';
+import { useManual } from '@samplerealm/modules/editor/ManualOverlay.tsx';
+import { usePrompt } from '@samplerealm/modules/editor/PromptOverlay.tsx';
+import manualText from '../../Assets/Manual.md?raw';
 import type { SubBackend } from './backend.ts';
-import { IncDecButtons, LabeledCell, LinearSlider, PillToggle, Rotary } from './controls.tsx';
-import { EditorRootContext } from './editorRoot.ts';
+import { IncDecButtons, KnobRotary, LabeledCell, LinearSlider, PillToggle, Rotary } from './controls.tsx';
 import { EnvelopeView } from './EnvelopeView.tsx';
-import { HeaderBar, type HeaderLayout } from './HeaderBar.tsx';
-import { useManual } from './ManualOverlay.tsx';
 import { MASTER_SECTION_WIDTH, MasterSection } from './MasterSection.tsx';
 import { PitchWheel } from './PitchWheel.tsx';
-import { usePrompt } from './PromptOverlay.tsx';
 
 export const EDITOR_WIDTH = 700;
 export const EDITOR_HEIGHT = 640;
@@ -43,6 +45,9 @@ const CURVE_KNOB_SIZE = 32;
 const PILL_WIDTH = 52;
 const PILL_HEIGHT = 15;
 
+// ParameterCell::nameHeight, for both kinds of control
+const NAME_HEIGHT = 13;
+
 function Cell({ column, children }: { column: number; children: ReactNode }) {
   return (
     <div className="absolute" style={{ left: column * Math.floor(CONTENT_WIDTH / 4) + 6, top: 6 }}>
@@ -69,9 +74,27 @@ function Row({ row, children, background }: { row: number; children: ReactNode; 
 export const SubEditor = memo(function SubEditor({ backend }: { backend: SubBackend }) {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const { prompt, overlay } = usePrompt();
-  const manual = useManual();
+  const manual = useManual(manualText);
 
-  const knob = (id: string, column: number, accessory?: { node: ReactNode; width: number; height: number }) => (
+  // AudioPluginAudioProcessorEditor::addKnob: a plain rotary, on the shared slider
+  const knob = (id: string, column: number) => (
+    <Cell column={column}>
+      <LabeledSlider
+        backend={backend}
+        id={id}
+        label={backend.param(id).name}
+        width={CELL_WIDTH}
+        height={CELL_HEIGHT}
+        nameHeight={NAME_HEIGHT}
+        // The native knob's text has no unit
+        unit=""
+        rotary={KnobRotary}
+      />
+    </Cell>
+  );
+
+  // AudioPluginAudioProcessorEditor::addCell, for a knob with an accessory
+  const cellKnob = (id: string, column: number, accessory: { node: ReactNode; width: number; height: number }) => (
     <Cell column={column}>
       <LabeledCell
         backend={backend}
@@ -142,10 +165,10 @@ export const SubEditor = memo(function SubEditor({ backend }: { backend: SubBack
         </Row>
 
         <Row row={1} background={<EnvelopeView backend={backend} width={CONTENT_WIDTH} height={CONTENT_HEIGHT} />}>
-          {knob('envAttack', 0, curveKnob('envAttackCurve'))}
-          {knob('envDecay', 1, curveKnob('envDecayCurve'))}
+          {cellKnob('envAttack', 0, curveKnob('envAttackCurve'))}
+          {cellKnob('envDecay', 1, curveKnob('envDecayCurve'))}
           {knob('envSustain', 2)}
-          {knob('envRelease', 3, curveKnob('envReleaseCurve'))}
+          {cellKnob('envRelease', 3, curveKnob('envReleaseCurve'))}
         </Row>
 
         <Row row={2}>
@@ -154,7 +177,7 @@ export const SubEditor = memo(function SubEditor({ backend }: { backend: SubBack
           </Cell>
           {knob('saturationDrive', 1)}
           {knob('saturationDriveEnv', 2)}
-          {knob('glideTime', 3, { node: <PillToggle backend={backend} id="glideMode" />, width: PILL_WIDTH, height: PILL_HEIGHT })}
+          {cellKnob('glideTime', 3, { node: <PillToggle backend={backend} id="glideMode" />, width: PILL_WIDTH, height: PILL_HEIGHT })}
         </Row>
 
         <span className="absolute right-2.5 bottom-3 text-3xs font-normal text-[#00d9ff]/40">{`v${backend.info.version}`}</span>

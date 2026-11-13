@@ -104,8 +104,9 @@ workflow (see [Commands](#commands)).
 
 Like pluginval, the tests are not part of a plain build: the `debug` workflow builds only the plugin.
 
-Add a `.cpp` file to `Tests/` and reconfigure to pick it up. `Tests/TestHelpers.h` has helpers for
-setting parameters and processing buffers. Set `-DENABLE_UNIT_TESTS=OFF` to skip them entirely.
+Add a `.cpp` file to `Tests/` and reconfigure to pick it up. `Tests/TestHelpers.h` adds Sub's fixture to
+SampleRealm-Modules' `PluginTestHelpers.h`, which has helpers for setting parameters and processing buffers.
+Set `-DENABLE_UNIT_TESTS=OFF` to skip them entirely.
 
 ## Validating the Plugin
 
@@ -157,7 +158,7 @@ Needs Emscripten (`brew install emscripten`) and Node 24+.
 - Upload `wasm/build-wasm/SampleRealm-Sub-<version>/` to the asset bucket's `demos/`.
   [`wasm.yml`](.github/workflows/wasm.yml) builds the same folder on GitHub as an artifact of that name.
 - The `webview` build installs over the native one; run the `release` workflow to switch back.
-- Delete `wasm/patches/juce-wasm.patch` once JUCE fixes its wasm support.
+- The wasm build patches JUCE (`cmake/patches/juce-wasm.patch` in SampleRealm-Modules) until JUCE fixes its wasm support.
 
 ## Debugging in Xcode
 

@@ -1,7 +1,11 @@
 #include "CustomLookAndFeel.h"
-#include "HeaderBar.h"
-#include "ModalOverlay.h"
 #include <BinaryData.h>
+
+namespace
+{
+    // On the stepper's +/- buttons, which keep LookAndFeel_V4's font, as webui/src/controls.tsx's IncDecButtons
+    const juce::Identifier isSliderButton { "isSliderButton" };
+}
 
 //==============================================================================
 CustomLookAndFeel::CustomLookAndFeel()
@@ -13,7 +17,8 @@ CustomLookAndFeel::CustomLookAndFeel()
     setColour (juce::Slider::textBoxTextColourId, text);
     setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
     setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-    setColour (juce::Label::textColourId, textDim);
+    // The web's --color-fg, which the shared web overlays use
+    setColour (juce::Label::textColourId, text);
 
     setColour (juce::ComboBox::outlineColourId, panelBorder);
     setColour (juce::TextButton::buttonColourId, panel);
@@ -29,6 +34,10 @@ CustomLookAndFeel::CustomLookAndFeel()
     setColour (ModalOverlay::dimColourId, background.withAlpha (0.75f));
     setColour (ModalOverlay::panelColourId, panel);
     setColour (ModalOverlay::outlineColourId, panelBorder);
+    setColour (LevelMeter::backgroundColourId, panel);
+    setColour (LevelMeter::outlineColourId, panelBorder);
+    setColour (LevelMeter::barColourId, accent);
+    setColour (LevelMeter::clipColourId, juce::Colours::red);
     setColour (juce::TextEditor::backgroundColourId, background);
     setColour (juce::TextEditor::textColourId, text);
     setColour (juce::TextEditor::outlineColourId, panelBorder);
@@ -38,9 +47,28 @@ CustomLookAndFeel::CustomLookAndFeel()
     setColour (juce::ScrollBar::thumbColourId, accent);
 }
 
-juce::Font CustomLookAndFeel::getLabelFont (juce::Label&)
+juce::Font CustomLookAndFeel::getLabelFont (juce::Label& label)
 {
-    return boldFont (13.0f);
+    const auto font = label.getFont();
+    return getEditorFont (font.getHeight(), font.isBold());
+}
+
+juce::Font CustomLookAndFeel::getTextButtonFont (juce::TextButton& button, int buttonHeight)
+{
+    if (button.getProperties()[isSliderButton])
+        return LookAndFeel_V4::getTextButtonFont (button, buttonHeight);
+
+    return getEditorFont (12.0f, false);
+}
+
+juce::Font CustomLookAndFeel::getPopupMenuFont()
+{
+    return getEditorFont (13.0f, false);
+}
+
+juce::Font CustomLookAndFeel::getEditorFont (float height, bool bold)
+{
+    return bold ? boldFont (height) : juce::Font (orbitronRegular()).withHeight (height);
 }
 
 juce::Font CustomLookAndFeel::boldFont (float height)
@@ -67,6 +95,7 @@ juce::FontOptions CustomLookAndFeel::orbitronBold()
 juce::Button* CustomLookAndFeel::createSliderButton (juce::Slider&, bool isIncrement)
 {
     auto* button = new juce::TextButton (isIncrement ? "+" : "-");
+    button->getProperties().set (isSliderButton, true);
 
     button->setColour (juce::TextButton::buttonColourId, panel);
     button->setColour (juce::TextButton::textColourOffId, accent);

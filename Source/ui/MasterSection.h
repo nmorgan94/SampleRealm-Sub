@@ -1,7 +1,6 @@
 #pragma once
 
-#include "LevelMeter.h"
-#include <juce_audio_processors/juce_audio_processors.h>
+#include <controls/controls.h>
 
 //==============================================================================
 /**
@@ -11,12 +10,11 @@
 class MasterSection : public juce::Component
 {
 public:
-    static constexpr int labelWidth = 66, labelGap = 8, knobSize = 44, meterGap = 10, meterWidth = 14, meterHeight = 40;
+    static constexpr int labelWidth = 66, labelGap = 8, knobSize = 44, meterGap = 10, meterWidth = LevelMeter::barWidth, meterHeight = 40;
     static constexpr int preferredWidth = labelWidth + labelGap + knobSize + meterGap + meterWidth;
 
-    MasterSection (juce::AudioProcessorValueTreeState&, const juce::String& gainParamId, juce::Component& popupParent);
-
-    void setLevel (float linearLevel, bool isClipping);
+    MasterSection (juce::AudioProcessorValueTreeState&, const juce::String& gainParamId, PeakMeter& outputMeter,
+                   juce::Component& popupParent);
 
     void paint (juce::Graphics&) override;
     void resized() override;

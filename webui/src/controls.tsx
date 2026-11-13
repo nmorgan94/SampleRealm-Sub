@@ -1,8 +1,10 @@
 // Mirrors Source/ui/CustomLookAndFeel.cpp and its controls
-import { useId, useLayoutEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useParam } from '@samplerealm/modules/editor/hooks.ts';
+import type { RotaryProps as SharedRotaryProps } from '@samplerealm/modules/editor/LabeledSlider.tsx';
+import { fromProportion, snap, toProportion } from '@samplerealm/modules/editor/params.ts';
 import type { ParamInfo, SubBackend } from './backend.ts';
-import { useParam, useShowValue } from './hooks.ts';
-import { formatValue, fromProportion, parseValue, snap, toProportion } from './params.ts';
+import { parseText, valueText } from './oscMixText.ts';
 
 // JUCE's defaults
 const ROTARY_START = -0.8 * Math.PI;
@@ -75,6 +77,11 @@ function KnobGraphic({ size, proportion }: { size: number; proportion: number })
   );
 }
 
+// CustomLookAndFeel::drawRotarySlider, for the shared LabeledSlider
+export function KnobRotary({ width, height, proportion }: SharedRotaryProps) {
+  return <KnobGraphic size={Math.min(width, height)} proportion={proportion} />;
+}
+
 type DragStart = { x: number; y: number; value: number };
 
 interface ParamDrag {
@@ -121,7 +128,7 @@ function useParamDrag(backend: SubBackend, id: string, { valueAt, jumps, onStart
     'aria-valuemin': param.min,
     'aria-valuemax': param.max,
     'aria-valuenow': value,
-    'aria-valuetext': formatValue(param, value),
+    'aria-valuetext': valueText(param, value),
   };
 
   return { ...state, handlers, aria };
@@ -175,7 +182,7 @@ export function Rotary({ backend, id, size, popup, resetTo, onDragStart, onDragE
       onDoubleClick={resetTo === undefined ? undefined : () => commit(resetTo)}
     >
       <KnobGraphic size={size} proportion={toProportion(param, value)} />
-      {popup && <Bubble text={formatValue(param, value)} visible={dragging} />}
+      {popup && <Bubble text={valueText(param, value)} visible={dragging} />}
     </div>
   );
 }
@@ -189,6 +196,27 @@ interface LabeledCellProps {
   accessory?: { node: ReactNode; width: number; height: number };
 }
 
+const SHOW_VALUE_MS = 600;
+
+function useShowValue() {
+  const [showing, setShowing] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+
+  const start = useCallback(() => {
+    window.clearTimeout(timer.current);
+    setShowing(true);
+  }, []);
+
+  const end = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setShowing(false), SHOW_VALUE_MS);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  return { showing, start, end };
+}
+
 const LABEL_HEIGHT = 16;
 const LABEL = 'h-4 text-center text-2xs leading-4 whitespace-nowrap';
 
@@ -199,7 +227,7 @@ export function LabeledCell({ backend, id, width, height, control, accessory }: 
 
   const commitText = (text: string) => {
     setEditing(false);
-    const parsed = parseValue(param, text);
+    const parsed = parseText(param, text);
     if (parsed !== null) commit(parsed);
   };
 
@@ -214,7 +242,7 @@ export function LabeledCell({ backend, id, width, height, control, accessory }: 
         <input
           className={`${LABEL} w-full border border-accent bg-panel outline-none`}
           autoFocus
-          defaultValue={formatValue(param, value)}
+          defaultValue={valueText(param, value)}
           onFocus={(e) => e.currentTarget.select()}
           onBlur={(e) => commitText(e.currentTarget.value)}
           onKeyDown={(e) => {
@@ -223,7 +251,7 @@ export function LabeledCell({ backend, id, width, height, control, accessory }: 
           }}
         />
       ) : (
-        <div className={`${LABEL} text-fg-dim`}>{show.showing ? formatValue(param, value) : param.name}</div>
+        <div className={LABEL}>{show.showing ? valueText(param, value) : param.name}</div>
       )}
       {accessory && (
         <div className="flex items-center justify-center" style={{ height: accessory.height }}>
@@ -337,39 +365,3 @@ export function Stepper({ backend, id, label }: { backend: SubBackend; id: strin
   );
 }
 
-export function TextButton({ className = '', ...props }: ComponentProps<'button'>) {
-  return (
-    <button
-      type="button"
-      className={`cursor-pointer rounded-md border border-panel-border bg-panel px-1.5 font-sans text-xs font-normal text-fg hover:bg-panel-hover ${className}`}
-      {...props}
-    />
-  );
-}
-
-const MIN_SQUEEZE = 0.7;
-
-// As drawFittedText on one line: squeezed to fit, as far as 70% wide, then cut short with "…"
-export function FittedText({ text, width }: { text: string; width: number }) {
-  const span = useRef<HTMLSpanElement>(null);
-  const [squeeze, setSqueeze] = useState(1);
-
-  useLayoutEffect(() => {
-    const measure = () => {
-      const natural = span.current?.scrollWidth ?? 0;
-      setSqueeze(natural > width ? Math.max(MIN_SQUEEZE, width / natural) : 1);
-    };
-    measure();
-    document.fonts?.ready.then(measure);
-  }, [text, width]);
-
-  return (
-    <span
-      ref={span}
-      className="inline-block shrink-0 origin-left overflow-hidden text-ellipsis whitespace-nowrap"
-      style={{ maxWidth: width / squeeze, transform: `scaleX(${squeeze})` }}
-    >
-      {text}
-    </span>
-  );
-}

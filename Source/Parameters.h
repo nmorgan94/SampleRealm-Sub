@@ -32,5 +32,6 @@ namespace Parameters
     inline const juce::ParameterID pitchBendId { ParameterSpecs::pitchBend.id, versionHint };
     inline const juce::ParameterID pitchBendRangeId { ParameterSpecs::pitchBendRange.id, versionHint };
 
-    juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+    // For createParameterLayout: Osc Mix's text, as webui/src/oscMixText.ts
+    juce::AudioParameterFloatAttributes withValueText (const ParameterSpecs::Spec&, juce::AudioParameterFloatAttributes);
 }

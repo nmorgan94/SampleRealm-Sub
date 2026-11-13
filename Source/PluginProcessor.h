@@ -1,10 +1,11 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <samplerealm/PeakMeter.h>
 #include "Parameters.h"
 #include "PitchBendInput.h"
 #include "dsp/SubSynth.h"
-#include "presets/PresetManager.h"
+#include <editor/editor.h>
 
 //==============================================================================
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
@@ -49,23 +50,22 @@ public:
     //==============================================================================
     juce::AudioProcessorValueTreeState& getAPVTS() { return apvts; }
     PresetManager& getPresetManager() { return presetManager; }
+    PeakMeter& getOutputMeter() { return outputMeter; }
 
     static PresetManager::Config createPresetConfig();
 
-    float getOutputLevel() const { return outputPeakLevel.load (std::memory_order_relaxed); }
-    bool isOutputClipping() const { return clipHoldCounter.load (std::memory_order_relaxed) > 0; }
-
 private:
     juce::AudioProcessorValueTreeState apvts { *this, nullptr, "Parameters",
-                                               Parameters::createLayout() };
+                                               createParameterLayout (ParameterSpecs::all, Parameters::versionHint,
+                                                                      Parameters::withValueText) };
     PresetManager presetManager { apvts, createPresetConfig() };
 
     SubSynth synth;
 
     PitchBendInput pitchBendInput { *apvts.getParameter (Parameters::pitchBendId.getParamID()) };
 
-    std::atomic<float> outputPeakLevel { 0.0f };
-    std::atomic<int> clipHoldCounter { 0 };
+    // Both channels carry the same mono signal
+    PeakMeter outputMeter { 1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

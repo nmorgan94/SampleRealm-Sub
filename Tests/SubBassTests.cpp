@@ -93,8 +93,23 @@ TEST_CASE_METHOD (ProcessorFixture, "Every parameter is built as its spec says a
                 CHECK (parameter->getIndex() == juce::roundToInt (spec->defaultValue));
                 break;
             }
+
+            case ParameterSpecs::Kind::toggle:
+            {
+                auto* parameter = getTyped<juce::AudioParameterBool> (processor, spec->id);
+                CHECK (parameter->get() == (spec->defaultValue >= 0.5f));
+                break;
+            }
         }
     }
+}
+
+TEST_CASE_METHOD (ProcessorFixture, "Osc Mix shows and reads its split, as webui/src/oscMixText.ts", "[parameters]")
+{
+    auto& oscMix = *processor.getAPVTS().getParameter (Parameters::oscMixId.getParamID());
+
+    CHECK (oscMix.getText (oscMix.convertTo0to1 (0.13f), 100) == "87 / 13");
+    CHECK_THAT (oscMix.convertFrom0to1 (oscMix.getValueForText ("30 / 70")), WithinAbs (0.7, 1.0e-4));
 }
 
 //==============================================================================
@@ -108,6 +123,19 @@ TEST_CASE_METHOD (ProcessorFixture, "Only mono or stereo output layouts are supp
 
     CHECK_FALSE (processor.isBusesLayoutSupported ({ {}, { Set::create5point1() } }));
     CHECK_FALSE (processor.isBusesLayoutSupported ({ {}, { Set::quadraphonic() } }));
+}
+
+//==============================================================================
+TEST_CASE_METHOD (ProcessorFixture, "Opening the editor drops peaks played while it was closed", "[editor]")
+{
+    juce::AudioBuffer<float> loud { 2, blockSize };
+    loud.clear();
+    loud.setSample (0, 0, 2.0f);
+    processor.getOutputMeter().process (loud);
+
+    const std::unique_ptr<juce::AudioProcessorEditor> editor { processor.createEditor() };
+
+    CHECK (processor.getOutputMeter().readAndReset (0) == 0.0f);
 }
 
 //==============================================================================

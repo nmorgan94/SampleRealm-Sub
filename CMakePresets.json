@@ -34,7 +34,7 @@
       "displayName": "Release with the WebView editor",
       "description": "Release build using webui/'s WebView editor, to try it; not for shipping",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "SUB_WEBVIEW_EDITOR": "ON" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "PLUGIN_WEBVIEW_EDITOR": "ON" }
     },
     {
       "name": "xcode",

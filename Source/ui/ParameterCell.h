@@ -4,17 +4,21 @@
 
 //==============================================================================
 /**
-    A rotary slider with its name shown below it. While the slider is being
-    dragged, the label swaps to show the current value instead; on release it
-    reverts to the name. Double-clicking the slider lets you type an exact
-    value into the label.
+    A slider of any style with its name shown below it, for the controls the shared
+    LabeledSlider can't show: steppers, a linear slider, and knobs with an accessory.
+    While the slider is being dragged, the label swaps to show the current value
+    instead; on release it reverts to the name. Double-clicking the slider lets you
+    type an exact value into the label. Mirrored by LabeledCell in webui/src/controls.tsx.
 */
-class LabeledSlider : public juce::Component,
-                       private juce::Timer,
-                       private juce::Label::Listener
+class ParameterCell : public juce::Component,
+                      private juce::Timer,
+                      private juce::Label::Listener
 {
 public:
-    explicit LabeledSlider (juce::Slider::SliderStyle style = juce::Slider::RotaryHorizontalVerticalDrag);
+    // The shared knobs beside it use the same, as NAME_HEIGHT in webui/src/SubEditor.tsx
+    static constexpr float nameHeight = 13.0f;
+
+    explicit ParameterCell (juce::Slider::SliderStyle style = juce::Slider::RotaryHorizontalVerticalDrag);
 
     void attachToParameter (juce::AudioProcessorValueTreeState& apvts, const juce::String& paramId);
     void setLabelText (const juce::String& newText);
@@ -48,5 +52,5 @@ private:
     static constexpr int revertDelayMs = 600;
     static constexpr int incDecButtonsHeight = 70;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LabeledSlider)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ParameterCell)
 };

@@ -1,63 +1,43 @@
+// The engine's note behaviour, which only these tests cover
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { localEnginePath } from '../webui/localEngine.ts';
-import { readUiInfo, stubImports } from '../webui/src/demo/workletBackend.ts';
+import { blockSize, sampleRate } from '@samplerealm/modules/testing/engine.ts';
+import { engine as freshEngine } from './engine.ts';
 
-const sampleRate = 48000;
-const blockSize = 128;
 const noteOn = 0x90;
 const noteOff = 0x80;
 const pitchWheel = 0xe0;
 
-const wasm = new WebAssembly.Module(readFileSync(localEnginePath()));
-
-const paramIds = (exports) => readUiInfo(exports).params.map((p) => p.id);
-
 function engine() {
-  const { exports } = new WebAssembly.Instance(wasm, stubImports());
-  exports._initialize?.();
-  exports.prepare(sampleRate);
-
-  const ids = paramIds(exports);
-  const set = (id, value) => {
-    assert.ok(ids.includes(id), `no parameter ${id}`);
-    exports.setParam(ids.indexOf(id), value);
-  };
+  const { engine: exports, set, renderBlocks } = freshEngine();
 
   // A pure sine, so zero crossings give the pitch
   set('oscOctave', 0);
   set('saturationDrive', 0);
 
-  const play = (seconds) => {
-    const out = [];
-    for (let n = 0; n < Math.round((seconds * sampleRate) / blockSize); n++) {
-      out.push(...new Float32Array(exports.memory.buffer, exports.render(blockSize), blockSize));
-    }
-    return out;
-  };
+  const play = (seconds: number) => Array.from(renderBlocks(Math.round(seconds * sampleRate))[0]!);
 
-  return { ...exports, set, play };
+  return { set, midi: exports.midi, play };
 }
 
-const peak = (samples) => Math.max(...samples.map(Math.abs));
+const peak = (samples: number[]) => Math.max(...samples.map(Math.abs));
 
-const frequency = (samples) => {
+const frequency = (samples: number[]) => {
   let rising = 0;
-  for (let i = 1; i < samples.length; i++) if (samples[i - 1] < 0 && samples[i] >= 0) rising++;
+  for (let i = 1; i < samples.length; i++) if (samples[i - 1]! < 0 && samples[i]! >= 0) rising++;
   return rising / (samples.length / sampleRate);
 };
 
 test('the ui info carries the version and every parameter as ParameterSpecs defines it', () => {
-  const info = readUiInfo(engine());
+  const { info } = freshEngine();
 
   assert.match(info.version, /^\d+\.\d+\.\d+$/);
   assert.equal(new Set(info.params.map((p) => p.id)).size, info.params.length);
   assert.deepEqual(info.params.find((p) => p.id === 'envRelease'), {
     id: 'envRelease', name: 'Release', kind: 'real', min: 0.001, max: 5, defaultValue: 0.2,
-    step: 0.001, skew: 0.3, unit: 's', choices: [], isPerformanceControl: false,
+    step: 0.001, skew: 0.3, unit: 's', choices: [],
   });
-  assert.deepEqual(info.params.find((p) => p.id === 'glideMode').choices, ['Time', 'Rate']);
+  assert.deepEqual(info.params.find((p) => p.id === 'glideMode')!.choices, ['Time', 'Rate']);
   assert.deepEqual(info.params.filter((p) => p.isPerformanceControl).map((p) => p.id), ['pitchBend']);
 });
 

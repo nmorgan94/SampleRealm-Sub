@@ -1,98 +1,61 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Keyboard } from './Keyboard.tsx';
-import { qwertySemitone } from './qwerty.ts';
+import { DemoFrame } from '@samplerealm/modules/demo/DemoFrame.tsx';
+import { loadEngine, startWorklet } from '@samplerealm/modules/demo/engine.ts';
+import processorUrl from '@samplerealm/modules/demo/processor.js?url';
+import { qwertySemitone } from '@samplerealm/modules/demo/qwerty.ts';
+import type { WorkletBackend } from '@samplerealm/modules/demo/workletBackend.ts';
 import { EDITOR_HEIGHT, EDITOR_WIDTH, SubEditor } from '../SubEditor.tsx';
+import { demoBackend } from './demoBackend.ts';
 import { factoryPresets } from './factoryPresets.ts';
-import { loadEngine, workletBackend, type WorkletBackend } from './workletBackend.ts';
-import { TextButton } from '../controls.tsx';
+import { Keyboard } from './Keyboard.tsx';
 import './styles.css';
 
 const ENGINE_URL = 'engine.wasm';
-const PROCESSOR_URL = 'processor.js';
+
+// The engine is mono; the worklet copies it to both outputs
+const CHANNELS = 1;
 
 // C3
 const LOW_NOTE = 48;
 const NUM_KEYS = 25;
 
-const SIZE_MESSAGE = 'samplerealm-demo-size';
-
-// Blocked storage throws on access
-function browserStorage() {
-  try {
-    return window.localStorage;
-  } catch {
-    return undefined;
-  }
+// LookAndFeel_V4's TextButton with CustomLookAndFeel's colours
+function DemoButton({ className = '', ...props }: ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      className={`cursor-pointer rounded-md border border-panel-border bg-panel px-1.5 font-sans text-xs font-normal text-fg hover:bg-panel-hover ${className}`}
+      {...props}
+    />
+  );
 }
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 
-async function startAudio(backend: WorkletBackend, wasm: ArrayBuffer, audio: AudioContext) {
-  await audio.audioWorklet.addModule(PROCESSOR_URL);
-
-  const node = new AudioWorkletNode(audio, 'sub-processor', {
+async function startAudio(backend: WorkletBackend, wasm: ArrayBuffer, context: AudioContext) {
+  const node = await startWorklet(context, processorUrl, {
     numberOfInputs: 0,
     outputChannelCount: [2],
-    processorOptions: { wasm },
+    processorOptions: { wasm, channels: CHANNELS },
   });
 
-  await new Promise<void>((resolve, reject) => {
-    node.port.onmessage = ({ data }) => {
-      if (data.type === 'ready') resolve();
-      else if (data.type === 'error') reject(new Error(data.message));
-    };
-  });
-
-  node.connect(audio.destination);
-  backend.attach(node);
-}
-
-function useScale() {
-  const [scale, setScale] = useState(1);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const observer = new ResizeObserver(() => setScale(Math.min(1, element.clientWidth / EDITOR_WIDTH)));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  return { ref, scale };
+  node.connect(context.destination);
+  backend.attach(node.port);
 }
 
 function Demo() {
   const [engine, setEngine] = useState<{ backend: WorkletBackend; wasm: ArrayBuffer } | null>(null);
-  const [status, setStatus] = useState<'loading' | 'on' | 'failed'>('loading');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [active, setActive] = useState<ReadonlySet<number>>(new Set());
   const [midi, setMidi] = useState<MIDIAccess | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const starting = useRef<Promise<void> | null>(null);
-  const { ref, scale } = useScale();
-  const editor = useRef<HTMLDivElement>(null);
-
-  // Not the document's height, which never shrinks below the frame. The editor's box is measured,
-  // as its scale catches up with the frame's width a render late
-  useEffect(() => {
-    const content = ref.current;
-    const box = editor.current;
-    if (window.parent === window || !content || !box) return;
-
-    const report = () => {
-      const below = Math.round(content.getBoundingClientRect().height - box.getBoundingClientRect().height);
-      window.parent.postMessage({ type: SIZE_MESSAGE, editorWidth: EDITOR_WIDTH, editorHeight: EDITOR_HEIGHT, below }, '*');
-    };
-    const observer = new ResizeObserver(report);
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, [ref]);
 
   useEffect(() => {
     loadEngine(ENGINE_URL)
-      .then(({ wasm, info }) => setEngine({ backend: workletBackend(info, factoryPresets, browserStorage()), wasm }))
+      .then(({ wasm, info }) => setEngine({ backend: demoBackend(info, { factoryPresets }), wasm }))
       .catch((error) => {
         console.error('Demo engine failed to load:', error);
         setStatus('failed');
@@ -113,7 +76,7 @@ function Demo() {
     audio.current = context;
 
     starting.current = startAudio(engine.backend, engine.wasm, context)
-      .then(() => setStatus('on'))
+      .then(() => setStatus('ready'))
       .catch((error) => {
         console.error('Demo audio failed to start:', error);
         context.close();
@@ -216,30 +179,15 @@ function Demo() {
   useEffect(() => () => void audio.current?.close(), []);
 
   return (
-    <div className="mx-auto max-w-175" ref={ref}>
-      <div className="relative overflow-hidden rounded-xl" ref={editor} style={{ width: EDITOR_WIDTH * scale, height: EDITOR_HEIGHT * scale }}>
-        <div className="origin-top-left" style={{ width: EDITOR_WIDTH, height: EDITOR_HEIGHT, transform: `scale(${scale})` }}>
-          {engine && <SubEditor backend={engine.backend} />}
-        </div>
-        {status !== 'on' && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/55">
-            {status === 'failed' ? (
-              <p className="text-sm text-red-400">The demo couldn't start. Please try again later.</p>
-            ) : (
-              <p className="font-display text-sm font-bold text-accent">Loading…</p>
-            )}
-          </div>
-        )}
-      </div>
-
+    <DemoFrame width={EDITOR_WIDTH} height={EDITOR_HEIGHT} status={status} editor={engine && <SubEditor backend={engine.backend} />}>
       <Keyboard lowNote={LOW_NOTE} numKeys={NUM_KEYS} active={active} onNoteOn={noteOn} onNoteOff={noteOff} />
 
-      {status === 'on' && !midi && 'requestMIDIAccess' in navigator && (
-        <TextButton className="mt-2.5 h-7" onClick={connectMidi}>
+      {status === 'ready' && !midi && 'requestMIDIAccess' in navigator && (
+        <DemoButton className="mt-2.5 h-7" onClick={connectMidi}>
           Use a MIDI keyboard
-        </TextButton>
+        </DemoButton>
       )}
-    </div>
+    </DemoFrame>
   );
 }
 

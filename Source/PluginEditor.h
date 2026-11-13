@@ -1,16 +1,13 @@
 #pragma once
 
 #include "PluginProcessor.h"
-#include "ui/About.h"
 #include "ui/CustomLookAndFeel.h"
 #include "ui/EnvelopeVisualizer.h"
-#include "ui/HeaderBar.h"
-#include "ui/LabeledSlider.h"
-#include "ui/Manual.h"
 #include "ui/MasterSection.h"
+#include "ui/ParameterCell.h"
 #include "ui/PillButton.h"
 #include "ui/PitchWheel.h"
-#include "ui/PromptOverlay.h"
+#include <BinaryData.h>
 
 //==============================================================================
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
@@ -33,10 +30,14 @@ public:
 private:
     void timerCallback() override;
 
-    void addCurveKnob (LabeledSlider& owner, const juce::String& paramId);
+    void addCurveKnob (ParameterCell& owner, const juce::String& paramId);
 
-    LabeledSlider& addControl (const juce::String& paramId, const juce::String& labelText,
-                               juce::Slider::SliderStyle style = juce::Slider::RotaryHorizontalVerticalDrag);
+    // A shared knob, for a plain rotary control
+    void addKnob (const juce::String& paramId, const juce::String& labelText);
+
+    // Sub's own cell, for a stepper, a linear slider or a knob with an accessory
+    ParameterCell& addCell (const juce::String& paramId, const juce::String& labelText,
+                            juce::Slider::SliderStyle style = juce::Slider::RotaryHorizontalVerticalDrag);
 
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
@@ -44,7 +45,9 @@ private:
 
     CustomLookAndFeel customLookAndFeel;
 
-    std::vector<std::unique_ptr<LabeledSlider>> controls;
+    // The grid's knobs and cells, in order
+    std::vector<std::unique_ptr<juce::Component>> controls;
+    std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> knobAttachments;
 
     std::vector<std::unique_ptr<juce::Slider>> curveKnobs;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> curveKnobAttachments;
@@ -56,8 +59,8 @@ private:
     PitchWheel pitchWheel;
 
     PromptOverlay prompt;
-    ManualOverlay manual;
-    MasterSection masterSection { processorRef.getAPVTS(), Parameters::masterGainId.getParamID(), *this };
+    ManualOverlay manual { juce::String::createStringFromData (BinaryData::Manual_md, BinaryData::Manual_mdSize) };
+    MasterSection masterSection { processorRef.getAPVTS(), Parameters::masterGainId.getParamID(), processorRef.getOutputMeter(), *this };
     HeaderBar header { "SampleRealm: SUB", headerLayout, processorRef.getPresetManager(), prompt, [this] { manual.show(); },
                        About::text (processorRef), masterSection };
 
