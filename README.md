@@ -138,9 +138,8 @@ with `-DPLUGINVAL_VST3_VALIDATOR=ON`.
 ## CI
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds the Release plugin on macOS and Windows
-and runs the unit tests. It only runs when started by hand: **Actions → CI → Run workflow** on
-GitHub, or `gh workflow run ci.yml`. Tick **Also run pluginval** (or pass `-f pluginval=true`) to
-validate the plugin too, which takes longer.
+and runs the unit tests and pluginval. It runs on every push to `main`, or by hand:
+**Actions → CI → Run workflow** on GitHub, or `gh workflow run ci.yml`.
 
 Each run's page lists the plugins under **Artifacts** for 30 days: `SubBass-macOS.tar.gz` (VST3 and
 AU) and `SubBass-Windows.tar.gz` (VST3). They are unsigned.
