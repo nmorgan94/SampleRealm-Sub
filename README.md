@@ -157,6 +157,11 @@ Needs Emscripten (`brew install emscripten`) and Node 24+.
 - Upload `wasm/build-wasm/SampleRealm-Sub-<version>/` to the asset bucket's `demos/`.
   [`wasm.yml`](.github/workflows/wasm.yml) builds the same folder on GitHub as an artifact of that name.
 - The `webview` build installs over the native one; run the `release` workflow to switch back.
+- **Windows**: the `webview` build needs Microsoft's WebView2 package, installed once per machine from Windows PowerShell:
+  ```powershell
+  Register-PackageSource -provider NuGet -name nugetRepository -location https://www.nuget.org/api/v2
+  Install-Package Microsoft.Web.WebView2 -Scope CurrentUser -RequiredVersion 1.0.3485.44 -Source nugetRepository
+  ```
 - The wasm build patches JUCE (`cmake/patches/juce-wasm.patch` in SampleRealm-Modules) until JUCE fixes its wasm support.
 
 ## Debugging in Xcode
